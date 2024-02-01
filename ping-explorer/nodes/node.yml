@@ -1,0 +1,9 @@
+network: cosmos
+folder: '.simapp'
+daemon: simd
+chain_id: demo-222
+node_version: v0.50.3
+repo: https://github.com/cosmos/cosmos-sdk.git
+node_name: cosmos-test
+key_name: test
+minimum_gas_price: 0stake

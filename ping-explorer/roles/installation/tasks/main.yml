@@ -1,0 +1,35 @@
+---
+- name: Install prerequisites
+  become: true
+  apt:
+    name: 
+      - make
+      - gcc
+    state: present
+
+
+- name: Install the binary
+  block:
+  - name: Clone the git repo
+    git: 
+      repo: '{{ repo }}'
+      dest: '{{ user_dir }}/{{ network }}'
+      version: '{{ node_version }}'
+      update: yes
+      force: yes
+
+      
+  - name: Install node
+    command: 'make install'
+    args:
+      chdir: '{{ user_dir }}/{{ network }}'
+    environment:
+      PATH: '{{ path }}'
+      GOPATH: '{{ user_dir }}/go'
+    when: binary is undefined
+
+
+
+
+
+
