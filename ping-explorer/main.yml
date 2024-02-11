@@ -10,4 +10,5 @@
     - start_node
     - ping_prereq
     - ping_explorer
+    - faucet
 

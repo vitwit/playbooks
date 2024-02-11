@@ -1,0 +1,138 @@
+---
+- name: Install the faucet
+  become: true
+  shell: git clone https://github.com/ping-pub/faucet.git
+  args:
+    chdir: '{{ user_dir }}'
+
+- name: Remove existing config.js file
+  become: true
+  shell: rm -f config.js
+  args:
+    chdir: '{{ user_dir }}/faucet'
+
+- name: Copy the config.js file 
+  become: true
+  template:
+    src: 'templates/config.j2'
+    dest: '{{ user_dir }}/faucet/config.js'
+
+
+
+- name: Install express using npm
+  shell: >
+    . "{{ user_dir }}/.nvm/nvm.sh" &&
+    export PATH="{{ user_dir }}/.nvm/versions/node/v18.19.0/bin:$PATH" &&
+    npm install express
+
+
+- name: Run yarn
+  become: true
+  shell: >
+        . "{{ user_dir }}/.nvm/nvm.sh" && export PATH="{{ ansible_env.PATH }}:{{ user_dir }}/.nvm/versions/node/v18.19.0/bin" && cd '{{ user_dir }}/faucet' && yarn
+ 
+
+  
+
+- name: Copy the service file
+  become: true
+  template:
+    src: 'faucet.j2'
+    dest: '/etc/systemd/system/faucet.service'
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Start the service file
+  systemd:
+    name: faucet
+    state: started
+    enabled: yes  
+    
+- name:  sleep for a few seconds
+  command: sleep 10
+
+
+
+
+- name: Copy the mnemonic from the mnemonic.txt file
+  become: true
+  shell: cat mnemonic.txt
+  args:
+    chdir: '{{ user_dir }}/faucet/.faucet'
+  register: faucet_mnemonic
+
+
+
+
+
+
+
+- name: update the mnemonic field in config.js
+  become: true
+  lineinfile:
+    path: '{{ user_dir }}/faucet/config.js' 
+    regexp: '^\s*mnemonic:\s*"([^"]*)"'
+    line: 'mnemonic: "{{ faucet_mnemonic.stdout }}",'
+
+  
+
+
+
+
+
+- name: Add the faucet address to the keyring
+  become: true
+  shell: "echo '{{ faucet_mnemonic.stdout }}' | {{ daemon }} keys add faucet --recover --keyring-backend test"
+  environment:
+    PATH: '{{ path }}'
+    HOME: "{{ user_dir }}" 
+  become_user: '{{ ansible_user }}' 
+  become_method: sudo    
+
+- name: listing all the keys in keyring
+  shell: '{{ daemon }} keys list --keyring-backend test' 
+  register: list_key
+  environment:
+    PATH: '{{ path }}' 
+
+- name: Debug te keyring output
+  debug: 
+    var: list_key.stdout_lines
+
+- name: Debug the user dir
+  debug: 
+    msg: "User Directory: {{ user_dir }}"
+
+    
+
+- name: Retrieve the faucet address
+  become: true
+  shell: "{{ daemon }} keys show -a faucet --keyring-backend test"
+  register: faucet_addr
+  environment:
+    PATH: "{{ path }}"
+    HOME: "{{ user_dir }}"  
+
+- name: Transfer funds from genesis account to the faucet account  
+  shell: '{{ daemon }} tx bank send {{ key_name }} {{ faucet_addr.stdout }}  10000000000stake --keyring-backend test --chain-id {{ chain_id }} -y'
+  environment:
+    PATH: '{{ path }}'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+      
+      

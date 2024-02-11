@@ -11,13 +11,13 @@
     PATH: '{{ path }}'
 
 - name: Add genesis account     
-  command: '{{ daemon }} genesis add-genesis-account {{ key_name }} 100000000000stake --keyring-backend=test'
+  command: '{{ daemon }} genesis add-genesis-account {{ key_name }}  100000000000stake --keyring-backend test'
   environment:
     PATH: '{{ path }}'
 
 
 - name: Gentx Command
-  command: '{{ daemon }} genesis  gentx {{ key_name }} 100000000stake --chain-id {{ chain_id }} --keyring-backend test'
+  command: '{{ daemon }} genesis  gentx {{ key_name }} 90000000000stake --chain-id {{ chain_id }} --keyring-backend test'
   environment:
     PATH: '{{ path }}'
 

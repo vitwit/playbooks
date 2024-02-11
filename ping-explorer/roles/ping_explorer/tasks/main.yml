@@ -1,5 +1,6 @@
 ---
 - name: Install ping_explorer
+  become: true
   git:
     repo: '{{ ping_repo }}'
     dest: '{{ user_dir }}/explorer'
@@ -58,18 +59,20 @@
         dest: '{{ user_dir }}/explorer/chains/mainnet/{{ chain_id }}.json'   
 
 
-    - name: extract the sdk version
-      shell: grep 'github.com/cosmos/cosmos-sdk v' '{{ user_dir }}/{{ network }}/go.mod' | awk '{print $2}' | sed -n 's/^v//p'
-      register: sdk_version
+    # - name: extract the sdk version
+    #   shell: grep 'github.com/cosmos/cosmos-sdk v' '{{ user_dir }}/{{ network }}/go.mod' | awk '{print $2}' | sed -n 's/^v//p'
+    #   register: sdk_version
 
  
-    - name: Change the sdk version in the json file present in the mainnet folder
-      ansible.builtin.replace:
-        path: '{{ user_dir }}/explorer/chains/mainnet/{{ chain_id }}.json'
-        regexp: '"sdk_version": ".*"'
-        replace: '"sdk_version": "{{ sdk_version.stdout }}"'
+    # - name: Change the sdk version in the json file present in the mainnet folder
+    #   become: true
+    #   ansible.builtin.replace:
+    #     path: '{{ user_dir }}/explorer/chains/mainnet/{{ chain_id }}.json'
+    #     regexp: '"sdk_version": ".*"'
+    #     replace: '"sdk_version": "{{ sdk_version.stdout }}"'
 
     - name: Remove contents of /var/www/html
+      become: true
       shell: rm -rf *
       args:
         chdir: '/var/www/html/' 
@@ -79,6 +82,7 @@
         var: ansible_env.PATH
 
     - name: Build the explorer
+      become: true
       shell: >
             . "{{ user_dir }}/.nvm/nvm.sh" && export PATH="{{ ansible_env.PATH }}:{{ user_dir }}/.nvm/versions/node/v18.19.0/bin" && cd '{{ user_dir }}/explorer' && yarn install --ignore-engines && yarn build
       args:
@@ -89,6 +93,7 @@
   
 
     - name: Move the data inside dist folder to /var/www/html
+      become: true
       shell: cp -r dist/* /var/www/html/
       args:
         chdir: '{{ user_dir }}/explorer'  
