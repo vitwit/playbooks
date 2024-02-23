@@ -1,0 +1,20 @@
+{
+    "chain_name": "{{ chain_id }}",
+    "api": [
+        {"provider": "notional", "address": "http://{{ hostvars['test']['ansible_host'] }}:1317"}
+    ],
+    "rpc": [
+        {"provider": "icycro", "address": "http://{{ hostvars['test']['ansible_host'] }}:26657"}
+    ],
+    "sdk_version": "0.50.3",
+    "coin_type": "118",
+    "min_tx_fee": "800",
+    "addr_prefix": "cosmos",
+    "logo": "/logos/cosmos.svg",
+    "assets": [{
+        "base": "uatom",
+        "symbol": "ATOM",
+        "exponent": "6", 
+        "logo": "/logos/cosmos.svg"
+    }]
+}

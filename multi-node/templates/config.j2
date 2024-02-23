@@ -1,0 +1,72 @@
+import { stringToPath } from '@cosmjs/crypto'
+import fs from 'fs'
+// import { ethers } from 'ethers'
+import { Wallet, utils } from 'ethers';
+
+const HOME = ".faucet";
+const mnemonic_path= `${HOME}/mnemonic.txt`
+if (!fs.existsSync(mnemonic_path)) {
+    fs.mkdirSync(HOME, { recursive: true })
+    fs.writeFileSync(mnemonic_path, Wallet.fromMnemonic(
+        utils.entropyToMnemonic(utils.randomBytes(32))
+      ).mnemonic.phrase)
+}
+
+const mnemonic = fs.readFileSync(mnemonic_path, 'utf8')
+console.log("======================== faucet mnemonic =========================")
+console.log(mnemonic)
+console.log("==================================================================")
+
+export default {
+    port: 83, // http port 
+    db: {
+        path: "~/.faucet.db" // save request states 
+    },
+    project: {
+        name: "Demo of Side Exchange",
+        logo: "https://side.one/favicon.ico",
+        deployer: `<a href="https://demo.side.exchange">Side Exchange</a>`
+    },
+    blockchains: [
+        {
+            name: "vitwit",
+            endpoint: {
+                // make sure that CORS is enabled in rpc section in config.toml
+                // cors_allowed_origins = ["*"]
+                rpc_endpoint: "http://{{ hostvars['test']['ansible_host'] }}:26657",
+            },
+            sender: {
+                mnemonic: "",
+                option: {
+                    hdPaths: [stringToPath("m/44'/118'/0'/0/0")],
+                    prefix: "cosmos" // human readable address prefix
+                }
+            },
+            tx: {
+                amount: [
+                    {
+                        denom: "stake",
+                        amount: "10000000"
+                    },
+                ],
+                fee: {
+                    amount: [
+                        {
+                            amount: "1000",
+                            denom: "stake"
+                        }
+                    ],
+                    gas: "200000"
+                },
+		frequency_in_24h: "1000"	
+            },
+            limit: {
+                // how many times each wallet address is allowed in a window(24h)
+                address: 10, 
+                // how many times each ip is allowed in a window(24h),
+                // if you use proxy, double check if the req.ip is return client's ip.
+                ip: 10 
+            }
+        },        
+	]
+}	          
