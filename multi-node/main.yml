@@ -2,73 +2,65 @@
 - name: Run the commands
   hosts: test
   tasks:
-   
-
     - name: Install prerequisites
       become: true
       apt:
-        name: 
+        name:
           - make
           - jq
           - gcc
         state: present
 
     - name: Debug the user dir
-      debug: 
-        msg: "User Directory: {{ user_dir }}"    
+      debug:
+        msg: "User Directory: {{ user_dir }}"
 
     - name: Install the binary
       become: true
       block:
-      - name: Clone the git repo
-        git: 
-          repo: '{{ repo }}'
-          dest: '{{ user_dir }}/{{ network }}'
-          version: '{{ node_version }}'
-          update: yes
-          force: yes
+        - name: Clone the git repo
+          git:
+            repo: "{{ repo }}"
+            dest: "{{ user_dir }}/{{ network }}"
+            version: "{{ node_version }}"
+            update: yes
+            force: yes
 
-
-      - name: Install node
-        # become_user: '{{ansible_user}}'
-        command: 'make install'
-        args:
-          chdir: '{{ user_dir }}/{{ network }}'
-        environment:
-          PATH: '{{ path }}'
-          GOPATH: '{{ user_dir }}/go'
+        - name: Install node
+          command: "make install"
+          args:
+            chdir: "{{ user_dir }}/{{ network }}"
+          environment:
+            PATH: "{{ path }}"
+            GOPATH: "{{ user_dir }}/go"
 
     - name: Initialize the chain2
-      command: '{{ daemon }} init {{ node_name2 }} --chain-id {{ chain_id }} --home {{ user_dir }}/.simapp2'
+      command: "{{ daemon }} init {{ node_name2 }} --chain-id {{ chain_id }} --home {{ user_dir }}/.simapp2"
       environment:
-        PATH: '{{ path }}'
+        PATH: "{{ path }}"
 
-   
     - name: Add Keys2
-      command: '{{ daemon }} keys add {{ key_name2 }} --keyring-backend test --home {{ user_dir }}/.simapp2'
+      command: "{{ daemon }} keys add {{ key_name2 }} --keyring-backend test --home {{ user_dir }}/.simapp2"
       environment:
-        PATH: '{{ path }}'
+        PATH: "{{ path }}"
 
-    - name: Add genesis account 2     
-      command: '{{ daemon }} genesis add-genesis-account {{ key_name2 }}  100000000000{{ denom }} --keyring-backend test --home {{ user_dir }}/.simapp2'
+    - name: Add genesis account 2
+      command: "{{ daemon }} genesis add-genesis-account {{ key_name2 }}  100000000000{{ denom }} --keyring-backend test --home {{ user_dir }}/.simapp2"
       environment:
-        PATH: '{{ path }}'
-
+        PATH: "{{ path }}"
 
     - name: Gentx Command 2
-      command: '{{ daemon }} genesis  gentx {{ key_name2 }} 90000000000{{ denom }} --chain-id {{ chain_id }} --keyring-backend test --home {{ user_dir }}/.simapp2'
+      command: "{{ daemon }} genesis  gentx {{ key_name2 }} 90000000000{{ denom }} --chain-id {{ chain_id }} --keyring-backend test --home {{ user_dir }}/.simapp2"
       environment:
-        PATH: '{{ path }}'
+        PATH: "{{ path }}"
 
     - name: Update minimum gas price 2
       lineinfile:
-        path: '{{ user_dir }}/.simapp2/config/app.toml'
-        regexp: '^minimum-gas-prices ='
+        path: "{{ user_dir }}/.simapp2/config/app.toml"
+        regexp: "^minimum-gas-prices ="
         line: 'minimum-gas-prices = "{{ minimum_gas_price }}"'
         state: present
       when: minimum_gas_price is defined
-    
-
 
     - name: Retrieve the subnode1 address
       become: true
@@ -76,36 +68,27 @@
       register: sub1_addr
       environment:
         PATH: "{{ path }}"
-        HOME: "{{ user_dir }}"  
+        HOME: "{{ user_dir }}"
 
-      
-
-    
-
-    
     - name: Initialize the chain3
-      command: '{{ daemon }} init {{ node_name3 }} --chain-id {{ chain_id }} --home {{ user_dir }}/.simapp3'
+      command: "{{ daemon }} init {{ node_name3 }} --chain-id {{ chain_id }} --home {{ user_dir }}/.simapp3"
       environment:
-        PATH: '{{ path }}'
-
-    
-
+        PATH: "{{ path }}"
 
     - name: Add Keys3
-      command: '{{ daemon }} keys add {{ key_name3 }} --keyring-backend test --home {{ user_dir }}/.simapp3'
+      command: "{{ daemon }} keys add {{ key_name3 }} --keyring-backend test --home {{ user_dir }}/.simapp3"
       environment:
-        PATH: '{{ path }}'
+        PATH: "{{ path }}"
 
-    - name: Add genesis account 3     
-      command: '{{ daemon }} genesis add-genesis-account {{ key_name3 }}  100000000000{{ denom }} --keyring-backend test --home {{ user_dir }}/.simapp3'
+    - name: Add genesis account 3
+      command: "{{ daemon }} genesis add-genesis-account {{ key_name3 }}  100000000000{{ denom }} --keyring-backend test --home {{ user_dir }}/.simapp3"
       environment:
-        PATH: '{{ path }}'
-
+        PATH: "{{ path }}"
 
     - name: Gentx Command 3
-      command: '{{ daemon }} genesis  gentx {{ key_name3 }} 90000000000{{ denom }} --chain-id {{ chain_id }} --keyring-backend test --home {{ user_dir }}/.simapp3'
+      command: "{{ daemon }} genesis  gentx {{ key_name3 }} 90000000000{{ denom }} --chain-id {{ chain_id }} --keyring-backend test --home {{ user_dir }}/.simapp3"
       environment:
-        PATH: '{{ path }}'
+        PATH: "{{ path }}"
 
     - name: Retrieve the subnode2 address
       become: true
@@ -113,39 +96,34 @@
       register: sub2_addr
       environment:
         PATH: "{{ path }}"
-        HOME: "{{ user_dir }}"       
+        HOME: "{{ user_dir }}"
 
-    
-
-   
     - name: Update minimum gas price 3
       lineinfile:
-        path: '{{ user_dir }}/.simapp3/config/app.toml'
-        regexp: '^minimum-gas-prices ='
+        path: "{{ user_dir }}/.simapp3/config/app.toml"
+        regexp: "^minimum-gas-prices ="
         line: 'minimum-gas-prices = "{{ minimum_gas_price }}"'
         state: present
       when: minimum_gas_price is defined
 
-
     - name: Initialize the main chain
-      command: '{{ daemon }} init {{ node_name1 }} --chain-id {{ chain_id }} --home {{ user_dir }}/.simapp'
+      command: "{{ daemon }} init {{ node_name1 }} --chain-id {{ chain_id }} --home {{ user_dir }}/.simapp"
       environment:
-        PATH: '{{ path }}'
-
+        PATH: "{{ path }}"
 
     - name: Change denom to the required denom
       become: true
-      shell: sed -i $SED_EXT 's/"stake"/"{{ denom }}"/' {{ user_dir }}/.simapp/config/genesis.json     
+      shell: sed -i $SED_EXT 's/"stake"/"{{ denom }}"/' {{ user_dir }}/.simapp/config/genesis.json
 
-    - name: Replace voting_period value 
+    - name: Replace voting_period value
       lineinfile:
-        path: '{{ user_dir }}/.simapp/config/genesis.json'
+        path: "{{ user_dir }}/.simapp/config/genesis.json"
         regexp: '^(\s*)"voting_period":\s*".*?",'
-        line: '"voting_period": "{{ voting_period }}",'      
+        line: '"voting_period": "{{ voting_period }}",'
 
-    - name: Replace expediated voting_period value 
+    - name: Replace expediated voting_period value
       lineinfile:
-        path: '{{ user_dir }}/.simapp/config/genesis.json'
+        path: "{{ user_dir }}/.simapp/config/genesis.json"
         regexp: '^(\s*)"expedited_voting_period":\s*".*?",'
         line: '"expedited_voting_period": "{{ expedited_voting_period }}",'
 
@@ -153,19 +131,18 @@
       become: true
       shell: |
         jq '.app_state.gov.params.min_deposit[0].amount = "{{ min_deposit_value }}"' {{ user_dir }}/.simapp/config/genesis.json > temp.json && mv temp.json {{ user_dir }}/.simapp/config/genesis.json
-    
+
     - name: Add Keys1
-      command: '{{ daemon }} keys add {{ key_name1 }} --keyring-backend test --home {{ user_dir }}/.simapp'
+      command: "{{ daemon }} keys add {{ key_name1 }} --keyring-backend test --home {{ user_dir }}/.simapp"
       environment:
-        PATH: '{{ path }}'
+        PATH: "{{ path }}"
 
-    - name: Add genesis account 1 
-      become: true    
-      command: '{{ daemon }} genesis add-genesis-account {{ key_name1 }}  100000000000{{ denom }} --keyring-backend test --home {{ user_dir }}/.simapp'
+    - name: Add genesis account 1
+      become: true
+      command: "{{ daemon }} genesis add-genesis-account {{ key_name1 }}  100000000000{{ denom }} --keyring-backend test --home {{ user_dir }}/.simapp"
       environment:
-        PATH: '{{ path }}'
+        PATH: "{{ path }}"
 
-# /////////////////////////////////////////////////
 
     - name: Debug sub1 addr
       debug:
@@ -173,79 +150,61 @@
 
     - name: Debug sub2 addr
       debug:
-        var: sub2_addr.stdout    
+        var: sub2_addr.stdout
 
-    - name: Add genesis account 2 on simapp1 
-      become: true    
-      command: '{{ daemon }} genesis add-genesis-account {{ sub1_addr.stdout }}  100000000000{{ denom }} --keyring-backend test'
+    - name: Add genesis account 2 on simapp1
+      become: true
+      command: "{{ daemon }} genesis add-genesis-account {{ sub1_addr.stdout }}  100000000000{{ denom }} --keyring-backend test"
       environment:
-        PATH: '{{ path }}'
-        HOME: "{{ user_dir }}" 
+        PATH: "{{ path }}"
+        HOME: "{{ user_dir }}"
 
-    - name: Add genesis account 3 on simapp1 
-      become: true  
-      command: '{{ daemon }} genesis add-genesis-account {{ sub2_addr.stdout }}  100000000000{{ denom }} --keyring-backend test'
+    - name: Add genesis account 3 on simapp1
+      become: true
+      command: "{{ daemon }} genesis add-genesis-account {{ sub2_addr.stdout }}  100000000000{{ denom }} --keyring-backend test"
       environment:
-        PATH: '{{ path }}' 
-        HOME: "{{ user_dir }}"    
-
+        PATH: "{{ path }}"
+        HOME: "{{ user_dir }}"
 
     - name: Gentx Command 1
       become: true
-      command: '{{ daemon }} genesis  gentx {{ key_name1 }} 90000000000{{ denom }} --chain-id {{ chain_id }} --keyring-backend test --home {{ user_dir }}/.simapp'
+      command: "{{ daemon }} genesis  gentx {{ key_name1 }} 90000000000{{ denom }} --chain-id {{ chain_id }} --keyring-backend test --home {{ user_dir }}/.simapp"
       environment:
-        PATH: '{{ path }}'  
-  
-
-
+        PATH: "{{ path }}"
 
     - name: Copy gentx1 file into the localhost
       become: true
       shell: "sudo cp {{ user_dir }}/.simapp2/config/gentx/* {{ user_dir }}/.simapp/config/gentx"
-    
-   
 
     - name: Copy gentx2 file into the localhost
       become: true
       shell: "sudo cp {{ user_dir }}/.simapp3/config/gentx/* {{ user_dir }}/.simapp/config/gentx"
 
-     
-   
-
     - name: Update minimum gas price 1
       become: true
       lineinfile:
-        path: '{{ user_dir }}/.simapp/config/app.toml'
-        regexp: '^minimum-gas-prices ='
+        path: "{{ user_dir }}/.simapp/config/app.toml"
+        regexp: "^minimum-gas-prices ="
         line: 'minimum-gas-prices = "{{ minimum_gas_price }}"'
         state: present
       when: minimum_gas_price is defined
 
-   
-
-    - name: Collect gentxs  
+    - name: Collect gentxs
       become: true
-      command: '{{ daemon }} genesis  collect-gentxs --home {{ user_dir }}/.simapp'
+      command: "{{ daemon }} genesis  collect-gentxs --home {{ user_dir }}/.simapp"
       environment:
-        PATH: '{{ path }}'  
-
-
-
+        PATH: "{{ path }}"
 
     - name: Setup cosmovisor
       become: true
-      # become_user: '{{ ansible_user }}'
-      shell: 'go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest &&  mkdir -p {{ user_dir }}/.simapp/cosmovisor/genesis/bin && mkdir -p {{ user_dir }}/.simapp/cosmovisor/upgrades && cp $GOPATH/bin/simd {{ user_dir }}/.simapp/cosmovisor/genesis/bin/simd'
+      shell: "go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest &&  mkdir -p {{ user_dir }}/.simapp/cosmovisor/genesis/bin && mkdir -p {{ user_dir }}/.simapp/cosmovisor/upgrades && cp $GOPATH/bin/simd {{ user_dir }}/.simapp/cosmovisor/genesis/bin/simd"
       environment:
-        GOPATH: '{{ user_dir }}/go'
-        PATH: '{{ path }}'
+        GOPATH: "{{ user_dir }}/go"
+        PATH: "{{ path }}"
 
     - name: Change ownership of cosmovisor directory
       become: true
-      command: 'chown -R {{ ansible_user }}:{{ ansible_user }} {{ user_dir }}/.simapp/cosmovisor'    
-
-    
-
+      command: "chown -R {{ ansible_user }}:{{ ansible_user }} {{ user_dir }}/.simapp/cosmovisor"
 
     - name: Compress .simapp2 directory
       become: true
@@ -273,51 +232,35 @@
         dest: "{{ playbook_dir }}/simapp3.tar.gz"
         flat: yes
 
-
-
-
-
-
-
 - name: Copy simapp2 on node2
   hosts: subnode_1
   tasks:
     - name: Send the simapp2 to the respective node
-      copy: 
-        src: '{{ playbook_dir }}/simapp2.tar.gz'
-        dest: '{{ user_dir }}/simapp2.tar.gz'
+      copy:
+        src: "{{ playbook_dir }}/simapp2.tar.gz"
+        dest: "{{ user_dir }}/simapp2.tar.gz"
 
     - name: Unarchive the simapp2.gz file
       become: true
       unarchive:
         src: "{{ user_dir }}/simapp2.tar.gz"
-        dest: "{{ user_dir }}"  
+        dest: "{{ user_dir }}"
         remote_src: yes
 
-    
 - name: Copy simapp3 on node3
   hosts: subnode_2
   tasks:
     - name: Send the simapp3 to the respective node
-      copy: 
-        src: '{{ playbook_dir }}/simapp3.tar.gz'
-        dest: '{{ user_dir }}/simapp3.tar.gz'
+      copy:
+        src: "{{ playbook_dir }}/simapp3.tar.gz"
+        dest: "{{ user_dir }}/simapp3.tar.gz"
 
     - name: Unarchive the simapp3.gz file
       become: true
       unarchive:
         src: "{{ user_dir }}/simapp3.tar.gz"
-        dest: "{{ user_dir }}"  
-        remote_src: yes  
-
-
-   
-        
-        
-
-
-
-
+        dest: "{{ user_dir }}"
+        remote_src: yes
 
 - name: extract and replace the genesis
   hosts: test
@@ -334,18 +277,16 @@
         msg: "Ansible User: {{ ansible_user }}"
 
     - name: Debug the user dir
-      debug: 
+      debug:
         msg: "User Directory: {{ user_dir }}"
 
     - name: Extract node-id for main-node
       become: true
-      command: '{{ daemon }} tendermint show-node-id'
-      register: m_node_id  
+      command: "{{ daemon }} tendermint show-node-id"
+      register: m_node_id
       environment:
         PATH: "{{ path }}"
         HOME: "{{ user_dir }}"
-    
-      
 
 - name: Changing the existing sub genesis.json to the actual genesis.json
   hosts: subnode_1
@@ -354,7 +295,7 @@
       become: true
       copy:
         src: "{{ playbook_dir }}/genesis.json"
-        dest: "{{ user_dir }}/.simapp2/config/genesis.json"      
+        dest: "{{ user_dir }}/.simapp2/config/genesis.json"
 
 - name: Changing the existing sub genesis.json to the actual genesis.json
   hosts: subnode_2
@@ -363,8 +304,7 @@
       become: true
       copy:
         src: "{{ playbook_dir }}/genesis.json"
-        dest: "{{ user_dir }}/.simapp3/config/genesis.json"          
-
+        dest: "{{ user_dir }}/.simapp3/config/genesis.json"
 
 - name: Install prerequisites on node2
   hosts: subnode_1,subnode_2
@@ -372,7 +312,7 @@
     - name: Install prerequisites
       become: true
       apt:
-        name: 
+        name:
           - make
           - gcc
         state: present
@@ -380,51 +320,48 @@
     - name: Install the binary
       become: true
       block:
-      - name: Clone the git repo
-        git: 
-          repo: '{{ repo }}'
-          dest: '{{ user_dir }}/{{ network }}'
-          version: '{{ node_version }}'
-          update: yes
-          force: yes
+        - name: Clone the git repo
+          git:
+            repo: "{{ repo }}"
+            dest: "{{ user_dir }}/{{ network }}"
+            version: "{{ node_version }}"
+            update: yes
+            force: yes
 
-
-      - name: Install node
-        become: true
-        command: 'make install'
-        args:
-          chdir: '{{ user_dir }}/{{ network }}'
-        environment:
-          PATH: '{{ path }}'
-          GOPATH: '{{ user_dir }}/go'
-        when: binary is undefined
+        - name: Install node
+          become: true
+          command: "make install"
+          args:
+            chdir: "{{ user_dir }}/{{ network }}"
+          environment:
+            PATH: "{{ path }}"
+            GOPATH: "{{ user_dir }}/go"
+          when: binary is undefined
 
 - name: Replace dir on node2
   hosts: subnode_1
   tasks:
     - name: Remove the existing simapp and rename simapp2 to simapp
       become: true
-      shell: rm -rf .simapp && mv .simapp2 .simapp  
+      shell: rm -rf .simapp && mv .simapp2 .simapp
 
     - name: Setup cosmovisor
       become: true
-      # become_user: '{{ ansible_user }}'
-      shell: 'go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest &&  mkdir -p {{ user_dir }}/.simapp/cosmovisor/genesis/bin && mkdir -p {{ user_dir }}/.simapp/cosmovisor/upgrades && cp $GOPATH/bin/simd {{ user_dir }}/.simapp/cosmovisor/genesis/bin/simd'
+      shell: "go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest &&  mkdir -p {{ user_dir }}/.simapp/cosmovisor/genesis/bin && mkdir -p {{ user_dir }}/.simapp/cosmovisor/upgrades && cp $GOPATH/bin/simd {{ user_dir }}/.simapp/cosmovisor/genesis/bin/simd"
       environment:
-        GOPATH: '{{ user_dir }}/go'
-        PATH: '{{ path }}'  
+        GOPATH: "{{ user_dir }}/go"
+        PATH: "{{ path }}"
 
     - name: Change ownership of cosmovisor directory
       become: true
-      command: 'chown -R {{ ansible_user }}:{{ ansible_user }} {{ user_dir }}/.simapp/cosmovisor'
-
+      command: "chown -R {{ ansible_user }}:{{ ansible_user }} {{ user_dir }}/.simapp/cosmovisor"
 
     - name: Extract node-id for sub node1
       become: true
-      shell: '{{ daemon }} tendermint show-node-id'
-      register: s1_node_id 
+      shell: "{{ daemon }} tendermint show-node-id"
+      register: s1_node_id
       environment:
-        PATH: '{{ path }}' 
+        PATH: "{{ path }}"
         HOME: "{{ user_dir }}"
 
 - name: Replace dir on node3
@@ -432,29 +369,26 @@
   tasks:
     - name: Remove the existing simapp and rename simapp3 to simapp
       become: true
-      shell: rm -rf .simapp && mv .simapp3 .simapp   
+      shell: rm -rf .simapp && mv .simapp3 .simapp
 
     - name: Setup cosmovisor
       become: true
-      # become_user: '{{ ansible_user }}'
       shell: go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest &&  mkdir -p {{ user_dir }}/.simapp/cosmovisor/genesis/bin && mkdir -p {{ user_dir }}/.simapp/cosmovisor/upgrades && cp $GOPATH/bin/simd {{ user_dir }}/.simapp/cosmovisor/genesis/bin/simd
       environment:
-        GOPATH: '{{ user_dir }}/go'
-        PATH: '{{ path }}'  
-    
+        GOPATH: "{{ user_dir }}/go"
+        PATH: "{{ path }}"
+
     - name: Change ownership of cosmovisor directory
       become: true
-      command: 'chown -R {{ ansible_user }}:{{ ansible_user }} {{ user_dir }}/.simapp/cosmovisor'
-    
+      command: "chown -R {{ ansible_user }}:{{ ansible_user }} {{ user_dir }}/.simapp/cosmovisor"
 
     - name: Extract node-id for sub node2
       become: true
-      shell: '{{ daemon }} tendermint show-node-id'
-      register: s2_node_id 
+      shell: "{{ daemon }} tendermint show-node-id"
+      register: s2_node_id
       environment:
-        PATH: '{{ path }}' 
-        HOME: "{{ user_dir }}" 
-
+        PATH: "{{ path }}"
+        HOME: "{{ user_dir }}"
 
 - name: Changing persistent peer
   hosts: test
@@ -463,7 +397,7 @@
       become: true
       lineinfile:
         path: .simapp/config/config.toml
-        regexp: '^persistent_peers ='
+        regexp: "^persistent_peers ="
         line: 'persistent_peers = "{{ hostvars["subnode_1"]["s1_node_id"]["stdout"] }}@{{ subnode_1 }}:26656,{{ hostvars["subnode_2"]["s2_node_id"]["stdout"] }}@{{ subnode_2 }}:26656"'
 
 - name: Changing persistent peer
@@ -473,9 +407,8 @@
       become: true
       lineinfile:
         path: .simapp/config/config.toml
-        regexp: '^persistent_peers ='
+        regexp: "^persistent_peers ="
         line: 'persistent_peers = "{{ hostvars["test"]["m_node_id"]["stdout"] }}@{{ test }}:26656,{{ hostvars["subnode_2"]["s2_node_id"]["stdout"] }}@{{ subnode_2 }}:26656"'
-
 
 - name: Changing persistent peer
   hosts: subnode_2
@@ -484,9 +417,8 @@
       become: true
       lineinfile:
         path: .simapp/config/config.toml
-        regexp: '^persistent_peers ='
+        regexp: "^persistent_peers ="
         line: 'persistent_peers = "{{ hostvars["test"]["m_node_id"]["stdout"] }}@{{ test }}:26656,{{ hostvars["subnode_1"]["s1_node_id"]["stdout"] }}@{{ subnode_1 }}:26656"'
-
 
 - name: Changing persistent peer
   hosts: test,subnode_2,subnode_1
@@ -494,23 +426,22 @@
     - name: Copy the service file
       become: true
       template:
-        src: '{{ playbook_dir }}/templates/node-service.j2'
-        dest: '/etc/systemd/system/{{ network }}.service'
+        src: "{{ playbook_dir }}/templates/node-service.j2"
+        dest: "/etc/systemd/system/{{ network }}.service"
         owner: root
         group: root
-        mode: '0644'
+        mode: "0644"
 
     - name: Start the service file
       become: true
       systemd:
-        name: '{{ network }}'
+        name: "{{ network }}"
         state: started
         enabled: yes
 
     - name: Restart the journald service file
       become: true
-      shell: systemctl restart systemd-journald.service     
-
+      shell: systemctl restart systemd-journald.service
 
 - name: Changing persistent peer
   hosts: test
@@ -559,74 +490,72 @@
     - name: Install ping_explorer
       become: true
       git:
-        repo: '{{ ping_repo }}'
-        dest: '{{ user_dir }}/explorer'
-        version: 'f35fb4485630a6d80a9246f29e753e9e75fefbd3'
-    
+        repo: "{{ ping_repo }}"
+        dest: "{{ user_dir }}/explorer"
+        version: "f35fb4485630a6d80a9246f29e753e9e75fefbd3"
 
     - name: Make required changes in app and config.toml
       block:
         - name: Make rpc publicly accessible
           become: true
-          lineinfile: 
-            path: '{{ user_dir }}/{{ folder }}/config/config.toml'
+          lineinfile:
+            path: "{{ user_dir }}/{{ folder }}/config/config.toml"
             regexp: 'laddr = "tcp://127.0.0.1:26657"'
-            line: 'laddr = "tcp://0.0.0.0:26657"'  
+            line: 'laddr = "tcp://0.0.0.0:26657"'
 
         - name: Making the change in the CORS section of config.toml
           become: true
           lineinfile:
-            path: '{{ user_dir }}/{{ folder }}/config/config.toml'
+            path: "{{ user_dir }}/{{ folder }}/config/config.toml"
             regexp: 'cors_allowed_origins = \[\]'
-            line: 'cors_allowed_origins = ["*"]'  
+            line: 'cors_allowed_origins = ["*"]'
 
         - name: Making the change in the CORS section of app.toml
           become: true
           lineinfile:
-            path: '{{ user_dir }}/{{ folder }}/config/app.toml'
-            regexp: 'enabled-unsafe-cors = false'       
-            line: 'enabled-unsafe-cors = true'
-
+            path: "{{ user_dir }}/{{ folder }}/config/app.toml"
+            regexp: "enabled-unsafe-cors = false"
+            line: "enabled-unsafe-cors = true"
 
         - name: set enable to true under api section
           become: true
           replace:
-            path: '{{ user_dir }}/{{ folder }}/config/app.toml'  
+            path: "{{ user_dir }}/{{ folder }}/config/app.toml"
             regexp: '(?ms)(\[api\][^\[]*enable\s*=\s*)false'
             replace: '\1true'
 
         - name: replace localhost under api section
           become: true
           replace:
-            path: '{{ user_dir }}/{{ folder }}/config/app.toml'
+            path: "{{ user_dir }}/{{ folder }}/config/app.toml"
             regexp: 'address = "tcp://localhost:1317"'
-            replace: 'address = "tcp://0.0.0.0:1317"'     
+            replace: 'address = "tcp://0.0.0.0:1317"'
 
         - name: Restart the systemd file of the node
           become: true
-          shell: systemctl restart {{ network }}.service    
+          shell: systemctl restart {{ network }}.service
 
         - name: Install nginx
           become: true
-          shell: sudo apt install -y nginx   
+          shell: sudo apt install -y nginx
 
         - name: move into the mainnet and remove the other files
           shell: rm -rf *
           args:
-            chdir: '{{ user_dir }}/explorer/chains/mainnet'  
-          become: yes    
+            chdir: "{{ user_dir }}/explorer/chains/mainnet"
+          become: yes
 
         - name: Copy the sample json file
           become: true
           template:
-            src: '{{ playbook_dir }}/templates/explorer-config.j2'
-            dest: '{{ user_dir }}/explorer/chains/mainnet/{{ chain_id }}.json'   
+            src: "{{ playbook_dir }}/templates/explorer-config.j2"
+            dest: "{{ user_dir }}/explorer/chains/mainnet/{{ chain_id }}.json"
 
         - name: Remove contents of /var/www/html
           become: true
           shell: rm -rf *
           args:
-            chdir: '/var/www/html/' 
+            chdir: "/var/www/html/"
 
         - name: Debug PATH
           ansible.builtin.debug:
@@ -635,19 +564,15 @@
         - name: Build the explorer
           become: true
           shell: >
-                . "{{ user_dir }}/.nvm/nvm.sh" && export PATH="{{ ansible_env.PATH }}:{{ user_dir }}/.nvm/versions/node/v18.19.0/bin" && cd '{{ user_dir }}/explorer' && yarn install --ignore-engines && yarn build
+            . "{{ user_dir }}/.nvm/nvm.sh" && export PATH="{{ ansible_env.PATH }}:{{ user_dir }}/.nvm/versions/node/v18.19.0/bin" && cd '{{ user_dir }}/explorer' && yarn install --ignore-engines && yarn build
           args:
-            chdir: '{{ user_dir }}/explorer'
-
-
-
-
+            chdir: "{{ user_dir }}/explorer"
 
         - name: Move the data inside dist folder to /var/www/html
           become: true
           shell: cp -r dist/* /var/www/html/
           args:
-            chdir: '{{ user_dir }}/explorer'  
+            chdir: "{{ user_dir }}/explorer"
 
         - name: Restart the journald service file
           become: true
@@ -660,22 +585,19 @@
       become: true
       shell: git clone https://github.com/ping-pub/faucet.git
       args:
-        chdir: '{{ user_dir }}'
+        chdir: "{{ user_dir }}"
 
     - name: Remove existing config.js file
       become: true
       shell: rm -f config.js
       args:
-        chdir: '{{ user_dir }}/faucet'
+        chdir: "{{ user_dir }}/faucet"
 
-    - name: Copy the config.js file 
+    - name: Copy the config.js file
       become: true
       template:
-        src: '{{ playbook_dir }}/templates/faucet-config.j2'
-        dest: '{{ user_dir }}/faucet/config.js'
-      
-
-
+        src: "{{ playbook_dir }}/templates/faucet-config.j2"
+        dest: "{{ user_dir }}/faucet/config.js"
 
     - name: Install express using npm
       become: true
@@ -684,86 +606,65 @@
         export PATH="{{ user_dir }}/.nvm/versions/node/v18.19.0/bin:$PATH" &&
         npm install express
 
-
     - name: Run yarn
       become: true
       shell: >
-            . "{{ user_dir }}/.nvm/nvm.sh" && export PATH="{{ ansible_env.PATH }}:{{ user_dir }}/.nvm/versions/node/v18.19.0/bin" && cd '{{ user_dir }}/faucet' && yarn
-
-
-
+        . "{{ user_dir }}/.nvm/nvm.sh" && export PATH="{{ ansible_env.PATH }}:{{ user_dir }}/.nvm/versions/node/v18.19.0/bin" && cd '{{ user_dir }}/faucet' && yarn
 
     - name: Copy the service file
       become: true
       template:
-        src: '{{ playbook_dir }}/templates/faucet-service.j2'
-        dest: '/etc/systemd/system/faucet.service'
+        src: "{{ playbook_dir }}/templates/faucet-service.j2"
+        dest: "/etc/systemd/system/faucet.service"
         owner: root
         group: root
-        mode: '0644'
+        mode: "0644"
 
     - name: Start the service file
       systemd:
         name: faucet
         state: started
-        enabled: yes  
+        enabled: yes
 
-    - name:  sleep for a few seconds
+    - name: sleep for a few seconds
       command: sleep 10
-
-
-
 
     - name: Copy the mnemonic from the mnemonic.txt file
       become: true
       shell: cat mnemonic.txt
       args:
-        chdir: '{{ user_dir }}/faucet/.faucet'
+        chdir: "{{ user_dir }}/faucet/.faucet"
       register: faucet_mnemonic
-
-
-
-
-
-
 
     - name: update the mnemonic field in config.js
       become: true
       lineinfile:
-        path: '{{ user_dir }}/faucet/config.js' 
+        path: "{{ user_dir }}/faucet/config.js"
         regexp: '^\s*mnemonic:\s*"([^"]*)"'
         line: 'mnemonic: "{{ faucet_mnemonic.stdout }}",'
-
-
-
-
-
-
 
     - name: Add the faucet address to the keyring
       become: true
       shell: "echo '{{ faucet_mnemonic.stdout }}' | {{ daemon }} keys add faucet --recover --keyring-backend test"
       environment:
-        PATH: '{{ path }}'
-        HOME: "{{ user_dir }}" 
-      become_user: '{{ ansible_user }}' 
-      become_method: sudo    
+        PATH: "{{ path }}"
+        HOME: "{{ user_dir }}"
+      become_user: "{{ ansible_user }}"
+      become_method: sudo
 
     - name: listing all the keys in keyring
-      shell: '{{ daemon }} keys list --keyring-backend test' 
+      shell: "{{ daemon }} keys list --keyring-backend test"
       register: list_key
       environment:
-        PATH: '{{ path }}' 
+        PATH: "{{ path }}"
 
     - name: Debug te keyring output
-      debug: 
+      debug:
         var: list_key.stdout_lines
 
     - name: Debug the user dir
-      debug: 
+      debug:
         msg: "User Directory: {{ user_dir }}"
-
-
 
     - name: Retrieve the faucet address
       become: true
@@ -771,31 +672,9 @@
       register: faucet_addr
       environment:
         PATH: "{{ path }}"
-        HOME: "{{ user_dir }}"  
+        HOME: "{{ user_dir }}"
 
-    - name: Transfer funds from genesis account to the faucet account  
-      shell: '{{ daemon }} tx bank send {{ key_name1 }} {{ faucet_addr.stdout }}  10000000000{{ denom }} --keyring-backend test --chain-id {{ chain_id }} -y'
+    - name: Transfer funds from genesis account to the faucet account
+      shell: "{{ daemon }} tx bank send {{ key_name1 }} {{ faucet_addr.stdout }}  10000000000{{ denom }} --keyring-backend test --chain-id {{ chain_id }} -y"
       environment:
-        PATH: '{{ path }}'
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-      
-      
+        PATH: "{{ path }}"
