@@ -143,7 +143,6 @@
       environment:
         PATH: "{{ path }}"
 
-
     - name: Debug sub1 addr
       debug:
         var: sub1_addr.stdout
