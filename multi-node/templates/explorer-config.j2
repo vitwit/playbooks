@@ -1,10 +1,10 @@
 {
     "chain_name": "{{ chain_id }}",
     "api": [
-        {"provider": "notional", "address": "http://{{ hostvars['test']['ansible_host'] }}:1317"}
+        {"address": "http://{{ hostvars['test']['ansible_host'] }}:1317"}
     ],
     "rpc": [
-        {"provider": "icycro", "address": "http://{{ hostvars['test']['ansible_host'] }}:26657"}
+        {"address": "http://{{ hostvars['test']['ansible_host'] }}:26657"}
     ],
     "sdk_version": "0.50.3",
     "coin_type": "118",

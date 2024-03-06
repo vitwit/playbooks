@@ -6,30 +6,19 @@ PREREQUISITES:
     ```
 1. Clone the github repository.
 
-```
-network: cosmos
-folder: '.simapp'
-daemon: simd
-chain_id: demo-222
-node_version: v0.50.3
-repo: https://github.com/cosmos/cosmos-sdk.git
-node_name: cosmos-test
-key_name: test
-
-```
 
 2. In the inventory file make the required changes to the following fields:
 ```
 [hosting]
-test ansible_host=139.59.87.171 ansible_user=root
-subnode_1 ansible_host=143.110.189.166 ansible_user=root
-subnode_2 ansible_host=143.110.242.138 ansible_user=root
+test ansible_host=x.x.x.x ansible_user=root
+subnode_1 ansible_host=x.x.x.x ansible_user=root
+subnode_2 ansible_host=x.x.x.x ansible_user=root
 
 [all:vars]
 
-test=139.59.87.171
-subnode_1=143.110.189.166
-subnode_2=143.110.242.138
+test=x.x.x.x
+subnode_1=x.x.x.x
+subnode_2=x.x.x.x
 
 **NOTE: Make sure that the ip matches in both the sections wrt their names.**
 
@@ -48,7 +37,26 @@ key_name1=test1
 key_name2=test2
 key_name3=test3
 ```
-3. Run the playbook using the command :
+3. In the faucet-config.j2 file present in the templates change the denom to the one specified in the inventory
+```
+{
+                amount: [
+                    {
+                        denom: "atom",
+                        amount: "10000000"
+                    },
+                ],
+                fee: {
+                    amount: [
+                        {
+                            amount: "1000",
+                            denom: "atom"
+                        }
+
+```
+
+
+4. Run the playbook using the command :
 ```
 ansible-playbook main.yml  -i inventory.ini
 ```

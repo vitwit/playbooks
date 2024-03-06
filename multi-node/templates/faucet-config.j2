@@ -2,7 +2,6 @@ import { stringToPath } from '@cosmjs/crypto'
 import fs from 'fs'
 // import { ethers } from 'ethers'
 import { Wallet, utils } from 'ethers';
-
 const HOME = ".faucet";
 const mnemonic_path= `${HOME}/mnemonic.txt`
 if (!fs.existsSync(mnemonic_path)) {
@@ -45,7 +44,7 @@ export default {
             tx: {
                 amount: [
                     {
-                        denom: "stake",
+                        denom: "atom",
                         amount: "10000000"
                     },
                 ],
@@ -53,7 +52,7 @@ export default {
                     amount: [
                         {
                             amount: "1000",
-                            denom: "stake"
+                            denom: "atom"
                         }
                     ],
                     gas: "200000"
