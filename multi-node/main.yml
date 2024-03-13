@@ -144,39 +144,39 @@
       when: minimum_gas_price is defined
 
     - name: Initialize the main chain
-      command: "{{ daemon }} init {{ validator_1_name }} --chain-id {{ chain_id }} --home {{ user_home }}/.simapp"
+      command: "{{ daemon }} init {{ validator_1_name }} --chain-id {{ chain_id }} --home {{ user_home }}/{{ node_home }}"
       environment:
         PATH: "{{ path }}"
 
     - name: Change denom to the required denom
       become: true
-      shell: sed -i $SED_EXT 's/"stake"/"{{ denom }}"/' {{ user_home }}/.simapp/config/genesis.json
+      shell: sed -i $SED_EXT 's/"stake"/"{{ denom }}"/' {{ user_home }}/{{ node_home }}/config/genesis.json
 
     - name: Replace voting_period value
       lineinfile:
-        path: "{{ user_home }}/.simapp/config/genesis.json"
+        path: "{{ user_home }}/{{ node_home }}/config/genesis.json"
         regexp: '^(\s*)"voting_period":\s*".*?",'
         line: '"voting_period": "{{ voting_period }}",'
 
     - name: Replace expediated voting_period value
       lineinfile:
-        path: "{{ user_home }}/.simapp/config/genesis.json"
+        path: "{{ user_home }}/{{ node_home }}/config/genesis.json"
         regexp: '^(\s*)"expedited_voting_period":\s*".*?",'
         line: '"expedited_voting_period": "{{ expedited_voting_period }}",'
 
     - name: Update "amount" value in the JSON file
       become: true
       shell: |
-        jq '.app_state.gov.params.min_deposit[0].amount = "{{ min_deposit_value }}"' {{ user_home }}/.simapp/config/genesis.json > temp.json && mv temp.json {{ user_home }}/.simapp/config/genesis.json
+        jq '.app_state.gov.params.min_deposit[0].amount = "{{ min_deposit_value }}"' {{ user_home }}/{{ node_home }}/config/genesis.json > temp.json && mv temp.json {{ user_home }}/{{ node_home }}/config/genesis.json
 
     - name: Add Keys1
-      command: "{{ daemon }} keys add {{ validator_1_key }} --keyring-backend test --home {{ user_home }}/.simapp"
+      command: "{{ daemon }} keys add {{ validator_1_key }} --keyring-backend test --home {{ user_home }}/{{ node_home }}"
       environment:
         PATH: "{{ path }}"
 
     - name: Add genesis account 1
       become: true
-      command: "{{ daemon }} genesis add-genesis-account {{ validator_1_key }}  100000000000{{ denom }} --keyring-backend test --home {{ user_home }}/.simapp"
+      command: "{{ daemon }} genesis add-genesis-account {{ validator_1_key }}  100000000000{{ denom }} --keyring-backend test --home {{ user_home }}/{{ node_home }}"
       environment:
         PATH: "{{ path }}"
 
@@ -204,22 +204,22 @@
 
     - name: Gentx Command 1
       become: true
-      command: "{{ daemon }} genesis  gentx {{ validator_1_key }} 90000000000{{ denom }} --chain-id {{ chain_id }} --keyring-backend test --home {{ user_home }}/.simapp"
+      command: "{{ daemon }} genesis  gentx {{ validator_1_key }} 90000000000{{ denom }} --chain-id {{ chain_id }} --keyring-backend test --home {{ user_home }}/{{ node_home }}"
       environment:
         PATH: "{{ path }}"
 
     - name: Copy validator 2 gentx file into the validator 1 gentx folder
       become: true
-      shell: "sudo cp {{ user_home }}/{{ node_home }}2/config/gentx/* {{ user_home }}/.simapp/config/gentx"
+      shell: "sudo cp {{ user_home }}/{{ node_home }}2/config/gentx/* {{ user_home }}/{{ node_home }}/config/gentx"
 
     - name: Copy validator 3 gentx file into the validator 1 gentx folder
       become: true
-      shell: "sudo cp {{ user_home }}/{{ node_home }}3/config/gentx/* {{ user_home }}/.simapp/config/gentx"
+      shell: "sudo cp {{ user_home }}/{{ node_home }}3/config/gentx/* {{ user_home }}/{{ node_home }}/config/gentx"
 
     - name: Update minimum gas price on validator_1
       become: true
       lineinfile:
-        path: "{{ user_home }}/.simapp/config/app.toml"
+        path: "{{ user_home }}/{{ node_home }}/config/app.toml"
         regexp: "^minimum-gas-prices ="
         line: 'minimum-gas-prices = "{{ minimum_gas_price }}"'
         state: present
@@ -227,20 +227,20 @@
 
     - name: Collect gentxs
       become: true
-      command: "{{ daemon }} genesis  collect-gentxs --home {{ user_home }}/.simapp"
+      command: "{{ daemon }} genesis  collect-gentxs --home {{ user_home }}/{{ node_home }}"
       environment:
         PATH: "{{ path }}"
 
     - name: Setup cosmovisor for validator_1
       become: true
-      shell: "go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest &&  mkdir -p {{ user_home }}/.simapp/cosmovisor/genesis/bin && mkdir -p {{ user_home }}/.simapp/cosmovisor/upgrades && cp $GOPATH/bin/simd {{ user_home }}/.simapp/cosmovisor/genesis/bin/simd"
+      shell: "go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest &&  mkdir -p {{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin && mkdir -p {{ user_home }}/{{ node_home }}/cosmovisor/upgrades && cp $GOPATH/bin/{{ daemon }} {{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin/{{ daemon }}"
       environment:
         GOPATH: "{{ user_home }}/go"
         PATH: "{{ path }}"
 
     - name: Change ownership of cosmovisor directory
       become: true
-      command: "chown -R {{ ansible_user }}:{{ ansible_user }} {{ user_home }}/.simapp/cosmovisor"
+      command: "chown -R {{ ansible_user }}:{{ ansible_user }} {{ user_home }}/{{ node_home }}/cosmovisor"
 
     - name: Compress simapp2 directory
       become: true
@@ -255,7 +255,7 @@
         dest: "{{ playbook_dir }}/simapp2.tar.gz"
         flat: yes
 
-    - name: Compress .simapp3 directory
+    - name: Compress simapp3 directory
       become: true
       archive:
         path: "{{ user_home }}/{{ node_home }}3"
@@ -304,7 +304,7 @@
     - name: Fetch genesis.json from
       become: true
       fetch:
-        src: .simapp/config/genesis.json
+        src: "{{ node_home }}/config/genesis.json"
         dest: "{{ playbook_dir }}/genesis.json"
         flat: yes
 
@@ -379,14 +379,14 @@
 
     - name: Setup cosmovisor for validator_2
       become: true
-      shell: "go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest &&  mkdir -p {{ user_home }}/.simapp/cosmovisor/genesis/bin && mkdir -p {{ user_home }}/.simapp/cosmovisor/upgrades && cp $GOPATH/bin/simd {{ user_home }}/.simapp/cosmovisor/genesis/bin/simd"
+      shell: "go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest &&  mkdir -p {{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin && mkdir -p {{ user_home }}/{{ node_home }}/cosmovisor/upgrades && cp $GOPATH/bin/{{ daemon }} {{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin/{{ daemon }}"
       environment:
         GOPATH: "{{ user_home }}/go"
         PATH: "{{ path }}"
 
     - name: Change ownership of cosmovisor directory
       become: true
-      command: "chown -R {{ ansible_user }}:{{ ansible_user }} {{ user_home }}/.simapp/cosmovisor"
+      command: "chown -R {{ ansible_user }}:{{ ansible_user }} {{ user_home }}/{{ node_home }}/cosmovisor"
 
     - name: Extract node-id for validator_2
       become: true
@@ -405,14 +405,14 @@
 
     - name: Setup cosmovisor for validator_3
       become: true
-      shell: go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest &&  mkdir -p {{ user_home }}/.simapp/cosmovisor/genesis/bin && mkdir -p {{ user_home }}/.simapp/cosmovisor/upgrades && cp $GOPATH/bin/simd {{ user_home }}/.simapp/cosmovisor/genesis/bin/simd
+      shell: go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest &&  mkdir -p {{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin && mkdir -p {{ user_home }}/{{ node_home }}/cosmovisor/upgrades && cp $GOPATH/bin/{{ daemon }} {{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin/{{ daemon }}
       environment:
         GOPATH: "{{ user_home }}/go"
         PATH: "{{ path }}"
 
     - name: Change ownership of cosmovisor directory
       become: true
-      command: "chown -R {{ ansible_user }}:{{ ansible_user }} {{ user_home }}/.simapp/cosmovisor"
+      command: "chown -R {{ ansible_user }}:{{ ansible_user }} {{ user_home }}/{{ node_home }}/cosmovisor"
 
     - name: Extract node-id for validator_3
       become: true
@@ -428,7 +428,7 @@
     - name: Add persistant  peer for validator_1 node
       become: true
       lineinfile:
-        path: .simapp/config/config.toml
+        path: "{{ node_home }}/config/config.toml"
         regexp: "^persistent_peers ="
         line: 'persistent_peers = "{{ hostvars["validator_2"]["s1_node_id"]["stdout"] }}@{{ validator_2 }}:26656,{{ hostvars["validator_3"]["s2_node_id"]["stdout"] }}@{{ validator_3 }}:26656"'
 
@@ -438,7 +438,7 @@
     - name: Add persistant  peer for validator_2 node
       become: true
       lineinfile:
-        path: .simapp/config/config.toml
+        path: "{{ node_home }}/config/config.toml"
         regexp: "^persistent_peers ="
         line: 'persistent_peers = "{{ hostvars["validator_1"]["m_node_id"]["stdout"] }}@{{ validator_1 }}:26656,{{ hostvars["validator_3"]["s2_node_id"]["stdout"] }}@{{ validator_3 }}:26656"'
 
@@ -448,7 +448,7 @@
     - name: Add persistant  peer for validator_3 node
       become: true
       lineinfile:
-        path: .simapp/config/config.toml
+        path: "{{ node_home }}/config/config.toml"
         regexp: "^persistent_peers ="
         line: 'persistent_peers = "{{ hostvars["validator_1"]["m_node_id"]["stdout"] }}@{{ validator_1 }}:26656,{{ hostvars["validator_2"]["s1_node_id"]["stdout"] }}@{{ validator_2 }}:26656"'
 
@@ -475,238 +475,238 @@
       become: true
       shell: systemctl restart systemd-journald.service
 
-- name: Install dependencies
-  hosts: validator_1
-  tasks:
-    - name: Install nvm
-      shell: >
-        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.4/install.sh | bash &&
-        export NVM_DIR="{{ user_home }}/.nvm" &&
-        [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" &&
-        [ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
-      args:
-        executable: /bin/bash
+# - name: Install dependencies
+#   hosts: validator_1
+#   tasks:
+#     - name: Install nvm
+#       shell: >
+#         curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.4/install.sh | bash &&
+#         export NVM_DIR="{{ user_home }}/.nvm" &&
+#         [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" &&
+#         [ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
+#       args:
+#         executable: /bin/bash
 
-    - name: Install Node.js
-      shell: >
-        . "{{ user_home }}/.nvm/nvm.sh" &&
-        nvm install v18.19.0
-      environment:
-        NVM_DIR: "{{ user_home }}/.nvm"
-        PATH: "{{ user_home }}/.nvm/versions/node/v18.19.0/bin:{{ ansible_env.PATH }}"
-      become: yes
+#     - name: Install Node.js
+#       shell: >
+#         . "{{ user_home }}/.nvm/nvm.sh" &&
+#         nvm install v18.19.0
+#       environment:
+#         NVM_DIR: "{{ user_home }}/.nvm"
+#         PATH: "{{ user_home }}/.nvm/versions/node/v18.19.0/bin:{{ ansible_env.PATH }}"
+#       become: yes
 
-    - name: Update global PATH
-      lineinfile:
-        path: /etc/environment
-        line: 'PATH="{{ user_home }}/.nvm/versions/node/v18.19.0/bin:{{ ansible_env.PATH }}"'
-      become: yes
+#     - name: Update global PATH
+#       lineinfile:
+#         path: /etc/environment
+#         line: 'PATH="{{ user_home }}/.nvm/versions/node/v18.19.0/bin:{{ ansible_env.PATH }}"'
+#       become: yes
 
-    - name: Install npm
-      shell: >
-        . "{{ user_home }}/.nvm/nvm.sh" &&
-        nvm install-latest-npm
-      environment:
-        NVM_DIR: "{{ user_home }}/.nvm"
-        PATH: "{{ user_home }}/.nvm/versions/node/v18.19.0/bin:{{ ansible_env.PATH }}"
+#     - name: Install npm
+#       shell: >
+#         . "{{ user_home }}/.nvm/nvm.sh" &&
+#         nvm install-latest-npm
+#       environment:
+#         NVM_DIR: "{{ user_home }}/.nvm"
+#         PATH: "{{ user_home }}/.nvm/versions/node/v18.19.0/bin:{{ ansible_env.PATH }}"
 
-    - name: Install yarn
-      become: true
-      shell: >
-        . "{{ user_home }}/.nvm/nvm.sh" &&
-        npm install --global --unsafe-perm=true yarn
-      environment:
-        NVM_DIR: "{{ user_home }}/.nvm"
-        PATH: "{{ user_home }}/.nvm/versions/node/v18.19.0/bin:{{ ansible_env.PATH }}"
+#     - name: Install yarn
+#       become: true
+#       shell: >
+#         . "{{ user_home }}/.nvm/nvm.sh" &&
+#         npm install --global --unsafe-perm=true yarn
+#       environment:
+#         NVM_DIR: "{{ user_home }}/.nvm"
+#         PATH: "{{ user_home }}/.nvm/versions/node/v18.19.0/bin:{{ ansible_env.PATH }}"
 
-    - name: Install ping_explorer
-      become: true
-      git:
-        repo: "{{ ping_repo }}"
-        dest: "{{ user_home }}/explorer"
-        version: "f35fb4485630a6d80a9246f29e753e9e75fefbd3"
+#     - name: Install ping_explorer
+#       become: true
+#       git:
+#         repo: "{{ ping_repo }}"
+#         dest: "{{ user_home }}/explorer"
+#         version: "f35fb4485630a6d80a9246f29e753e9e75fefbd3"
 
-    - name: Make required changes in app and config.toml
-      block:
-        - name: Make rpc publicly accessible
-          become: true
-          lineinfile:
-            path: "{{ user_home }}/{{ node_home }}/config/config.toml"
-            regexp: 'laddr = "tcp://127.0.0.1:26657"'
-            line: 'laddr = "tcp://0.0.0.0:26657"'
+#     - name: Make required changes in app and config.toml
+#       block:
+#         - name: Make rpc publicly accessible
+#           become: true
+#           lineinfile:
+#             path: "{{ user_home }}/{{ node_home }}/config/config.toml"
+#             regexp: 'laddr = "tcp://127.0.0.1:26657"'
+#             line: 'laddr = "tcp://0.0.0.0:26657"'
 
-        - name: Making the change in the CORS section of config.toml
-          become: true
-          lineinfile:
-            path: "{{ user_home }}/{{ node_home }}/config/config.toml"
-            regexp: 'cors_allowed_origins = \[\]'
-            line: 'cors_allowed_origins = ["*"]'
+#         - name: Making the change in the CORS section of config.toml
+#           become: true
+#           lineinfile:
+#             path: "{{ user_home }}/{{ node_home }}/config/config.toml"
+#             regexp: 'cors_allowed_origins = \[\]'
+#             line: 'cors_allowed_origins = ["*"]'
 
-        - name: Making the change in the CORS section of app.toml
-          become: true
-          lineinfile:
-            path: "{{ user_home }}/{{ node_home }}/config/app.toml"
-            regexp: "enabled-unsafe-cors = false"
-            line: "enabled-unsafe-cors = true"
+#         - name: Making the change in the CORS section of app.toml
+#           become: true
+#           lineinfile:
+#             path: "{{ user_home }}/{{ node_home }}/config/app.toml"
+#             regexp: "enabled-unsafe-cors = false"
+#             line: "enabled-unsafe-cors = true"
 
-        - name: set enable to true under api section
-          become: true
-          replace:
-            path: "{{ user_home }}/{{ node_home }}/config/app.toml"
-            regexp: '(?ms)(\[api\][^\[]*enable\s*=\s*)false'
-            replace: '\1true'
+#         - name: set enable to true under api section
+#           become: true
+#           replace:
+#             path: "{{ user_home }}/{{ node_home }}/config/app.toml"
+#             regexp: '(?ms)(\[api\][^\[]*enable\s*=\s*)false'
+#             replace: '\1true'
 
-        - name: replace localhost under api section
-          become: true
-          replace:
-            path: "{{ user_home }}/{{ node_home }}/config/app.toml"
-            regexp: 'address = "tcp://localhost:1317"'
-            replace: 'address = "tcp://0.0.0.0:1317"'
+#         - name: replace localhost under api section
+#           become: true
+#           replace:
+#             path: "{{ user_home }}/{{ node_home }}/config/app.toml"
+#             regexp: 'address = "tcp://localhost:1317"'
+#             replace: 'address = "tcp://0.0.0.0:1317"'
 
-        - name: Restart the systemd file of the node
-          become: true
-          shell: systemctl restart {{ network }}.service
+#         - name: Restart the systemd file of the node
+#           become: true
+#           shell: systemctl restart {{ network }}.service
 
-        - name: Install nginx
-          become: true
-          shell: sudo apt install -y nginx
+#         - name: Install nginx
+#           become: true
+#           shell: sudo apt install -y nginx
 
-        - name: move into the mainnet and remove the other files
-          shell: rm -rf *
-          args:
-            chdir: "{{ user_home }}/explorer/chains/mainnet"
-          become: yes
+#         - name: move into the mainnet and remove the other files
+#           shell: rm -rf *
+#           args:
+#             chdir: "{{ user_home }}/explorer/chains/mainnet"
+#           become: yes
 
-        - name: Copy the sample json file
-          become: true
-          template:
-            src: "{{ playbook_dir }}/templates/explorer-config.j2"
-            dest: "{{ user_home }}/explorer/chains/mainnet/{{ chain_id }}.json"
+#         - name: Copy the sample json file
+#           become: true
+#           template:
+#             src: "{{ playbook_dir }}/templates/explorer-config.j2"
+#             dest: "{{ user_home }}/explorer/chains/mainnet/{{ chain_id }}.json"
 
-        - name: Remove contents of /var/www/html
-          become: true
-          shell: rm -rf *
-          args:
-            chdir: "/var/www/html/"
+#         - name: Remove contents of /var/www/html
+#           become: true
+#           shell: rm -rf *
+#           args:
+#             chdir: "/var/www/html/"
 
-        - name: Debug PATH
-          ansible.builtin.debug:
-            var: ansible_env.PATH
+#         - name: Debug PATH
+#           ansible.builtin.debug:
+#             var: ansible_env.PATH
 
-        - name: Build the explorer
-          become: true
-          shell: >
-            . "{{ user_home }}/.nvm/nvm.sh" && export PATH="{{ ansible_env.PATH }}:{{ user_home }}/.nvm/versions/node/v18.19.0/bin" && cd '{{ user_home }}/explorer' && yarn install --ignore-engines && yarn build
-          args:
-            chdir: "{{ user_home }}/explorer"
+#         - name: Build the explorer
+#           become: true
+#           shell: >
+#             . "{{ user_home }}/.nvm/nvm.sh" && export PATH="{{ ansible_env.PATH }}:{{ user_home }}/.nvm/versions/node/v18.19.0/bin" && cd '{{ user_home }}/explorer' && yarn install --ignore-engines && yarn build
+#           args:
+#             chdir: "{{ user_home }}/explorer"
 
-        - name: Move the data inside dist folder to /var/www/html
-          become: true
-          shell: cp -r dist/* /var/www/html/
-          args:
-            chdir: "{{ user_home }}/explorer"
+#         - name: Move the data inside dist folder to /var/www/html
+#           become: true
+#           shell: cp -r dist/* /var/www/html/
+#           args:
+#             chdir: "{{ user_home }}/explorer"
 
-        - name: Restart the journald service file
-          become: true
-          shell: systemctl restart systemd-journald.service
+#         - name: Restart the journald service file
+#           become: true
+#           shell: systemctl restart systemd-journald.service
 
-- name: Faucet related tasks
-  hosts: validator_1
-  tasks:
-    - name: Install the faucet
-      become: true
-      shell: git clone https://github.com/ping-pub/faucet.git
-      args:
-        chdir: "{{ user_home }}"
+# - name: Faucet related tasks
+#   hosts: validator_1
+#   tasks:
+#     - name: Install the faucet
+#       become: true
+#       shell: git clone https://github.com/ping-pub/faucet.git
+#       args:
+#         chdir: "{{ user_home }}"
 
-    - name: Remove existing config.js file
-      become: true
-      shell: rm -f config.js
-      args:
-        chdir: "{{ user_home }}/faucet"
+#     - name: Remove existing config.js file
+#       become: true
+#       shell: rm -f config.js
+#       args:
+#         chdir: "{{ user_home }}/faucet"
 
-    - name: Copy the config.js file
-      become: true
-      template:
-        src: "{{ playbook_dir }}/templates/faucet-config.j2"
-        dest: "{{ user_home }}/faucet/config.js"
+#     - name: Copy the config.js file
+#       become: true
+#       template:
+#         src: "{{ playbook_dir }}/templates/faucet-config.j2"
+#         dest: "{{ user_home }}/faucet/config.js"
 
-    - name: Install express using npm
-      become: true
-      shell: >
-        . "{{ user_home }}/.nvm/nvm.sh" &&
-        export PATH="{{ user_home }}/.nvm/versions/node/v18.19.0/bin:$PATH" &&
-        npm install express
+#     - name: Install express using npm
+#       become: true
+#       shell: >
+#         . "{{ user_home }}/.nvm/nvm.sh" &&
+#         export PATH="{{ user_home }}/.nvm/versions/node/v18.19.0/bin:$PATH" &&
+#         npm install express
 
-    - name: Run yarn
-      become: true
-      shell: >
-        . "{{ user_home }}/.nvm/nvm.sh" && export PATH="{{ ansible_env.PATH }}:{{ user_home }}/.nvm/versions/node/v18.19.0/bin" && cd '{{ user_home }}/faucet' && yarn
+#     - name: Run yarn
+#       become: true
+#       shell: >
+#         . "{{ user_home }}/.nvm/nvm.sh" && export PATH="{{ ansible_env.PATH }}:{{ user_home }}/.nvm/versions/node/v18.19.0/bin" && cd '{{ user_home }}/faucet' && yarn
 
-    - name: Copy the service file
-      become: true
-      template:
-        src: "{{ playbook_dir }}/templates/faucet-service.j2"
-        dest: "/etc/systemd/system/faucet.service"
-        owner: root
-        group: root
-        mode: "0644"
+#     - name: Copy the service file
+#       become: true
+#       template:
+#         src: "{{ playbook_dir }}/templates/faucet-service.j2"
+#         dest: "/etc/systemd/system/faucet.service"
+#         owner: root
+#         group: root
+#         mode: "0644"
 
-    - name: Start the service file
-      systemd:
-        name: faucet
-        state: started
-        enabled: yes
+#     - name: Start the service file
+#       systemd:
+#         name: faucet
+#         state: started
+#         enabled: yes
 
-    - name: sleep for a few seconds
-      command: sleep 10
+#     - name: sleep for a few seconds
+#       command: sleep 10
 
-    - name: Copy the mnemonic from the mnemonic.txt file
-      become: true
-      shell: cat mnemonic.txt
-      args:
-        chdir: "{{ user_home }}/faucet/.faucet"
-      register: faucet_mnemonic
+#     - name: Copy the mnemonic from the mnemonic.txt file
+#       become: true
+#       shell: cat mnemonic.txt
+#       args:
+#         chdir: "{{ user_home }}/faucet/.faucet"
+#       register: faucet_mnemonic
 
-    - name: update the mnemonic field in config.js
-      become: true
-      lineinfile:
-        path: "{{ user_home }}/faucet/config.js"
-        regexp: '^\s*mnemonic:\s*"([^"]*)"'
-        line: 'mnemonic: "{{ faucet_mnemonic.stdout }}",'
+#     - name: update the mnemonic field in config.js
+#       become: true
+#       lineinfile:
+#         path: "{{ user_home }}/faucet/config.js"
+#         regexp: '^\s*mnemonic:\s*"([^"]*)"'
+#         line: 'mnemonic: "{{ faucet_mnemonic.stdout }}",'
 
-    - name: Add the faucet address to the keyring
-      become: true
-      shell: "echo '{{ faucet_mnemonic.stdout }}' | {{ daemon }} keys add faucet --recover --keyring-backend test"
-      environment:
-        PATH: "{{ path }}"
-        HOME: "{{ user_home }}"
-      become_user: "{{ ansible_user }}"
-      become_method: sudo
+#     - name: Add the faucet address to the keyring
+#       become: true
+#       shell: "echo '{{ faucet_mnemonic.stdout }}' | {{ daemon }} keys add faucet --recover --keyring-backend test"
+#       environment:
+#         PATH: "{{ path }}"
+#         HOME: "{{ user_home }}"
+#       become_user: "{{ ansible_user }}"
+#       become_method: sudo
 
-    - name: listing all the keys in keyring
-      shell: "{{ daemon }} keys list --keyring-backend test"
-      register: list_key
-      environment:
-        PATH: "{{ path }}"
+#     - name: listing all the keys in keyring
+#       shell: "{{ daemon }} keys list --keyring-backend test"
+#       register: list_key
+#       environment:
+#         PATH: "{{ path }}"
 
-    - name: Debug te keyring output
-      debug:
-        var: list_key.stdout_lines
+#     - name: Debug te keyring output
+#       debug:
+#         var: list_key.stdout_lines
 
-    - name: Debug the user dir
-      debug:
-        msg: "User Directory: {{ user_home }}"
+#     - name: Debug the user dir
+#       debug:
+#         msg: "User Directory: {{ user_home }}"
 
-    - name: Retrieve the faucet address
-      become: true
-      shell: "{{ daemon }} keys show -a faucet --keyring-backend test"
-      register: faucet_addr
-      environment:
-        PATH: "{{ path }}"
-        HOME: "{{ user_home }}"
+#     - name: Retrieve the faucet address
+#       become: true
+#       shell: "{{ daemon }} keys show -a faucet --keyring-backend test"
+#       register: faucet_addr
+#       environment:
+#         PATH: "{{ path }}"
+#         HOME: "{{ user_home }}"
 
-    - name: Transfer funds from genesis account to the faucet account
-      shell: "{{ daemon }} tx bank send {{ validator_1_key }} {{ faucet_addr.stdout }}  10000000000{{ denom }} --keyring-backend test --chain-id {{ chain_id }} -y"
-      environment:
-        PATH: "{{ path }}"
+#     - name: Transfer funds from genesis account to the faucet account
+#       shell: "{{ daemon }} tx bank send {{ validator_1_key }} {{ faucet_addr.stdout }}  10000000000{{ denom }} --keyring-backend test --chain-id {{ chain_id }} -y"
+#       environment:
+#         PATH: "{{ path }}"
