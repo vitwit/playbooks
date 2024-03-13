@@ -5,13 +5,13 @@ After=network-online.target
 
 [Service]
 Environment="DAEMON_NAME={{ daemon }}"
-Environment="DAEMON_HOME={{ user_dir }}/{{ folder }}"
+Environment="DAEMON_HOME={{ user_home }}/{{ node_home }}"
 Environment="DAEMON_ALLOW_DOWNLOAD_BINARIES=false"
 Environment="DAEMON_RESTART_AFTER_UPGRADE=true"
 Environment="UNSAFE_SKIP_BACKUP=true"
 Environment="DAEMON_PREUPGRADE_MAX_RETRIES=0"
 User={{ansible_user}}
-ExecStart={{ user_dir }}/go/bin/cosmovisor run start 
+ExecStart={{ user_home }}/go/bin/cosmovisor run start 
 Restart=always
 RestartSec=3
 LimitNOFILE=4096
