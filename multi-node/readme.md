@@ -4,24 +4,21 @@
 1. Clone the github repository.
 
 
-2. In the inventory file make all the required changes
+2. In the inventory file make all the required changes to the following fields
 ```
-[hosting]
-validator_1 ansible_host=xx.xx.xx.xx ansible_user=root
-validator_2 ansible_host=xx.xx.xx.xx ansible_user=root
-validator_3 ansible_host=xx.xx.xx.xx ansible_user=root
+ansible_ssh_private_key_file="~/.ssh/id_rsa"
+ssh_file_path="Specify the path to the pub key"
+digital_token="Specify the digital ocean token"
+ssh_key_name="Specify the name assigned to your ssh key on digital ocean"
 
-[all:vars]
 
-validator_1=xx.xx.xx.xx
-validator_2=xx.xx.xx.xx
-validator_3=xx.xx.xx.xx
-
-**NOTE: Make sure that the ip matches in both the sections wrt their names.**
 
 ```
+You can also make changes to the user and denom field shown below
 ```
-
+denom=atom
+minimum_gas_price=0atom
+user=root
 ```
 3. In the faucet-config.j2 file present in the templates change the denom to the one specified in the inventory
 ```

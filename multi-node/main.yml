@@ -1,6 +1,136 @@
 ---
+- name: Create new Droplets
+  hosts: localhost
+  vars:
+    droplets_to_create: 3
+    digital_ocean_api_token: "dop_v1_a5a3866c01f6faefb851db7b9d4bfd54dfee8d9f996b37720cf6759fc7071931"
+    ssh_key_name: "Ritvik"
+  tasks:
+    - name: Get DigitalOcean SSH Key ID
+      uri:
+        url: "https://api.digitalocean.com/v2/account/keys"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ digital_ocean_api_token }}"
+        return_content: yes
+      register: ssh_key_response
+
+    - name: Debug SSH Key Response
+      debug:
+        var: ssh_key_response
+
+    - name: Parse SSH Key ID
+      set_fact:
+        ssh_key_id: "{{ (ssh_key_response.json | json_query(query)) | first }}"
+      vars:
+        query: "ssh_keys[?name=='{{ ssh_key_name }}'].id"
+
+   
+
+    - name: Read file contents
+      slurp:
+        src: "{{ ssh_file_path }}"
+      register: ssh_content   
+
+    - name: Store SSH key contents into a variable
+      set_fact:
+        ssh_key_variable: "{{ ssh_content['content'] | b64decode }}"     
+
+    - name: Create new Droplet
+      digital_ocean_droplet:
+        state: present
+        name: "test{{ item }}"
+        size: s-2vcpu-4gb
+        image: ubuntu-22-04-x64
+        region: blr1
+        ssh_keys: "{{ ssh_key_id }}"
+        monitoring: false
+        ipv6: false
+        user_data: |
+          #cloud-config
+          users:
+            - name: {{ user }}
+              groups: sudo
+              sudo: "ALL=(ALL) NOPASSWD:ALL"
+              shell: /bin/bash
+              ssh-authorized-keys:
+                - {{ ssh_key_variable  }}
+        api_token: "{{ digital_ocean_api_token }}"
+      with_sequence: start=1 end={{ droplets_to_create }}
+      register: do
+
+    - name: Extract IP addresses
+      set_fact:
+        ip_addresses: "{{ do.results | json_query('[].data.droplet.networks.v4[0].ip_address') | flatten }}"
+
+    - name: Set IP addresses as separate Ansible variables
+      set_fact:
+        validator1_ip: "{{ ip_addresses[0] }}"
+        validator2_ip: "{{ ip_addresses[1] }}"
+        validator3_ip: "{{ ip_addresses[2] }}"
+
+    - name: Debug separate IP addresses
+      debug:
+        msg:
+          - "Validator 1 IP: {{ validator1_ip }}"
+          - "Validator 2 IP: {{ validator2_ip }}"
+          - "Validator 3 IP: {{ validator3_ip }}"
+
+    - name: Add validator1 to host group
+      add_host:
+        name: "validator_1"
+        ansible_host: "{{ validator1_ip }}"
+        validator2_ip: "{{ ip_addresses[1] }}"
+        validator3_ip: "{{ ip_addresses[2] }}"
+
+        ansible_user: "{{ user }}"
+
+    - name: Add validator2 to host group
+      add_host:
+        name: "validator_2"
+        ansible_host: "{{ validator2_ip }}"
+        validator1_ip: "{{ ip_addresses[0] }}"
+        validator3_ip: "{{ ip_addresses[2] }}"
+        ansible_user: "{{ user }}"
+
+    - name: Add validator3 to host group
+      add_host:
+        name: "validator_3"
+        ansible_host: "{{ validator3_ip }}"
+        validator2_ip: "{{ ip_addresses[1] }}"
+        validator1_ip: "{{ ip_addresses[0] }}"
+        ansible_user: "{{ user }}"
+
+    - name: sleep for a few seconds
+      command: sleep 15
+
+    - name: Disable host key checking
+      set_fact:
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+
+    - name: Update validator_1 IP in inventory file
+      lineinfile:
+        path: ./inventory.ini
+        line: "validator_1 ansible_host={{ validator1_ip }} ansible_user={{ user }}"
+        insertafter: '^\[hosting\]'
+
+    - name: Update validator_2 IP in inventory file
+      lineinfile:
+        path: ./inventory.ini
+        line: "validator_2 ansible_host={{ validator2_ip }} ansible_user={{ user }}"
+        insertafter: '^\[hosting\]'
+
+    - name: Update validator_3 IP in inventory file
+      lineinfile:
+        path: ./inventory.ini
+        line: "validator_3 ansible_host={{ validator3_ip }} ansible_user={{ user }}"
+        insertafter: '^\[hosting\]'
+
+####################################################################################################################################
 - name: Golang installation
   hosts: validator_1,validator_2,validator_3
+  vars:
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
   tasks:
     - name: Debug the user dir
       debug:
@@ -35,6 +165,14 @@
 
     - name: sleep for a few seconds
       command: sleep 15
+
+    - name: Update apt package list
+      become: true
+      apt:
+        update_cache: yes
+
+    - name: sleep for a few seconds
+      command: sleep 30
 
     - name: Install prerequisites
       become: true
@@ -430,7 +568,7 @@
       lineinfile:
         path: "{{ node_home }}/config/config.toml"
         regexp: "^persistent_peers ="
-        line: 'persistent_peers = "{{ hostvars["validator_2"]["s1_node_id"]["stdout"] }}@{{ validator_2 }}:26656,{{ hostvars["validator_3"]["s2_node_id"]["stdout"] }}@{{ validator_3 }}:26656"'
+        line: 'persistent_peers = "{{ hostvars["validator_2"]["s1_node_id"]["stdout"] }}@{{ validator2_ip }}:26656,{{ hostvars["validator_3"]["s2_node_id"]["stdout"] }}@{{ validator3_ip }}:26656"'
 
 - name: Add persistent peer
   hosts: validator_2
@@ -440,7 +578,7 @@
       lineinfile:
         path: "{{ node_home }}/config/config.toml"
         regexp: "^persistent_peers ="
-        line: 'persistent_peers = "{{ hostvars["validator_1"]["m_node_id"]["stdout"] }}@{{ validator_1 }}:26656,{{ hostvars["validator_3"]["s2_node_id"]["stdout"] }}@{{ validator_3 }}:26656"'
+        line: 'persistent_peers = "{{ hostvars["validator_1"]["m_node_id"]["stdout"] }}@{{ validator1_ip }}:26656,{{ hostvars["validator_3"]["s2_node_id"]["stdout"] }}@{{ validator3_ip }}:26656"'
 
 - name: Add persistent peer
   hosts: validator_3
@@ -450,7 +588,7 @@
       lineinfile:
         path: "{{ node_home }}/config/config.toml"
         regexp: "^persistent_peers ="
-        line: 'persistent_peers = "{{ hostvars["validator_1"]["m_node_id"]["stdout"] }}@{{ validator_1 }}:26656,{{ hostvars["validator_2"]["s1_node_id"]["stdout"] }}@{{ validator_2 }}:26656"'
+        line: 'persistent_peers = "{{ hostvars["validator_1"]["m_node_id"]["stdout"] }}@{{ validator1_ip }}:26656,{{ hostvars["validator_2"]["s1_node_id"]["stdout"] }}@{{ validator2_ip }}:26656"'
 
 - name: Copy the node service file and start it
   hosts: validator_1,validator_2,validator_3
@@ -615,7 +753,7 @@
   tasks:
     - name: Install the faucet
       become: true
-      shell: git clone https://github.com/ping-pub/faucet.git
+      shell: git clone https://github.com/vitwit/ping-faucet.git faucet && cd faucet && git checkout multi-chains
       args:
         chdir: "{{ user_home }}"
 
@@ -653,6 +791,7 @@
         mode: "0644"
 
     - name: Start the service file
+      become: true
       systemd:
         name: faucet
         state: started
