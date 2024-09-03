@@ -1,10 +1,10 @@
 {
     "chain_name": "{{ chain_id }}",
     "api": [
-        {"address": "http://{{ hostvars['validator_1']['ansible_host'] }}:1317"}
+        {"address": "http://{{ lb2_ip }}"}
     ],
     "rpc": [
-        {"address": "http://{{ hostvars['validator_1']['ansible_host'] }}:26657"}
+        {"address": "http://{{ lb1_ip }}"}
     ],
     "sdk_version": "0.50.3",
     "coin_type": "118",

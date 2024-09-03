@@ -1,10 +1,9 @@
 ---
-- name: Create new Droplets
+- name: Create fullnode Droplets
   hosts: localhost
+  
   vars:
-    droplets_to_create: 3
-    digital_ocean_api_token: "dop_v1_a5a3866c01f6faefb851db7b9d4bfd54dfee8d9f996b37720cf6759fc7071931"
-    ssh_key_name: "Ritvik"
+ 
   tasks:
     - name: Get DigitalOcean SSH Key ID
       uri:
@@ -36,13 +35,13 @@
       set_fact:
         ssh_key_variable: "{{ ssh_content['content'] | b64decode }}"     
 
-    - name: Create new Droplet
+    - name: Create full node  Droplet
       digital_ocean_droplet:
         state: present
-        name: "test{{ item }}"
+        name: "fullnode{{ item }}"
         size: s-2vcpu-4gb
         image: ubuntu-22-04-x64
-        region: blr1
+        region: "{{ region }}"
         ssh_keys: "{{ ssh_key_id }}"
         monitoring: false
         ipv6: false
@@ -56,82 +55,122 @@
               ssh-authorized-keys:
                 - {{ ssh_key_variable  }}
         api_token: "{{ digital_ocean_api_token }}"
-      with_sequence: start=1 end={{ droplets_to_create }}
-      register: do
+      with_sequence: start=0 end={{ fullnode_count-1 }}
+      register: do1
+
+  
+    
+    - name: Extract IP addresses
+      set_fact:
+        ip_addresses: "{{ do1.results | json_query('[].data.droplet.networks.v4[0].ip_address') | flatten }}"
+
+   
+
+    - name: Reverse IP addresses list
+      set_fact:
+        reversed_ip_addresses: "{{ ip_addresses | zip(range(fullnode_count)) | list | reverse }}"
+
+    - name: Append IP addresses to .inventory file under [fullnodes]
+      lineinfile:
+        path: "inventory2.ini"
+        insertafter: "^\\[fullnodes\\]"
+        line: "fullnode{{ item.1 }} ansible_host={{ item.0 }} ansible_user={{ user }}"
+      loop: "{{ reversed_ip_addresses }}"
+      loop_control:
+        label: "{{ item[0] }}"
+
+
+
+
+    - name: Create validator  node  Droplets
+      digital_ocean_droplet:
+        state: present
+        name: "validator{{ item }}"
+        size: s-2vcpu-4gb
+        image: ubuntu-22-04-x64
+        region: "{{ region }}"
+        ssh_keys: "{{ ssh_key_id }}"
+        monitoring: false
+        ipv6: false
+        user_data: |
+          #cloud-config
+          users:
+            - name: {{ user }}
+              groups: sudo
+              sudo: "ALL=(ALL) NOPASSWD:ALL"
+              shell: /bin/bash
+              ssh-authorized-keys:
+                - {{ ssh_key_variable  }}
+        api_token: "{{ digital_ocean_api_token }}"
+      with_sequence: start=0 end={{ validators_count-1 }}
+      register: do2 
 
     - name: Extract IP addresses
       set_fact:
-        ip_addresses: "{{ do.results | json_query('[].data.droplet.networks.v4[0].ip_address') | flatten }}"
+        droplet_ids: "{{ do2.results | json_query('[].data.droplet.id') | flatten }}"
+        ip_addresses1: "{{ do2.results | json_query('[].data.droplet.networks.v4[0].ip_address') | flatten }}"
 
-    - name: Set IP addresses as separate Ansible variables
+    - name: Reverse IP addresses list
       set_fact:
-        validator1_ip: "{{ ip_addresses[0] }}"
-        validator2_ip: "{{ ip_addresses[1] }}"
-        validator3_ip: "{{ ip_addresses[2] }}"
-
-    - name: Debug separate IP addresses
+        reversed_ip_addresses1: "{{ ip_addresses1| zip(range(validators_count)) | list | reverse }}"
+    - name: Debug the user dir
       debug:
-        msg:
-          - "Validator 1 IP: {{ validator1_ip }}"
-          - "Validator 2 IP: {{ validator2_ip }}"
-          - "Validator 3 IP: {{ validator3_ip }}"
+        msg: "User Directory: {{ reversed_ip_addresses1 }}"    
 
-    - name: Add validator1 to host group
-      add_host:
-        name: "validator_1"
-        ansible_host: "{{ validator1_ip }}"
-        validator2_ip: "{{ ip_addresses[1] }}"
-        validator3_ip: "{{ ip_addresses[2] }}"
+    
+    
 
-        ansible_user: "{{ user }}"
-
-    - name: Add validator2 to host group
-      add_host:
-        name: "validator_2"
-        ansible_host: "{{ validator2_ip }}"
-        validator1_ip: "{{ ip_addresses[0] }}"
-        validator3_ip: "{{ ip_addresses[2] }}"
-        ansible_user: "{{ user }}"
-
-    - name: Add validator3 to host group
-      add_host:
-        name: "validator_3"
-        ansible_host: "{{ validator3_ip }}"
-        validator2_ip: "{{ ip_addresses[1] }}"
-        validator1_ip: "{{ ip_addresses[0] }}"
-        ansible_user: "{{ user }}"
-
-    - name: sleep for a few seconds
-      command: sleep 15
+    - name: Append IP addresses to .inventory file under [validators]
+      lineinfile:
+        path: "inventory2.ini"
+        insertafter: "^\\[validators\\]"
+        line: "validator{{ item.1 }} ansible_host={{ item.0 }} ansible_user={{ user }}"
+      loop: "{{ reversed_ip_addresses1 }}"
+      loop_control:
+        label: "{{ item[0] }}"
 
     - name: Disable host key checking
       set_fact:
         ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
 
-    - name: Update validator_1 IP in inventory file
-      lineinfile:
-        path: ./inventory.ini
-        line: "validator_1 ansible_host={{ validator1_ip }} ansible_user={{ user }}"
-        insertafter: '^\[hosting\]'
+    - name: sleep for a few seconds
+      command: sleep 20    
+      
 
-    - name: Update validator_2 IP in inventory file
-      lineinfile:
-        path: ./inventory.ini
-        line: "validator_2 ansible_host={{ validator2_ip }} ansible_user={{ user }}"
-        insertafter: '^\[hosting\]'
+    - name: Add new fullnodes to inventory
+      add_host:
+        name: "fullnode{{ item.1 }}"
+        ansible_host: "{{ item.0 }}"
+        ansible_user: "{{ user }}"
+        groups: fullnodes
+      loop: "{{ ip_addresses | zip(range(fullnode_count)) | list }}"
+      loop_control:
+        label: "{{ item[0] }}"
 
-    - name: Update validator_3 IP in inventory file
-      lineinfile:
-        path: ./inventory.ini
-        line: "validator_3 ansible_host={{ validator3_ip }} ansible_user={{ user }}"
-        insertafter: '^\[hosting\]'
+    - name: Add new validators to inventory
+      add_host:
+        name: "validator{{ item.1 }}"
+        ansible_host: "{{ item.0 }}"
+        ansible_user: "{{ user }}"
+        groups: validators
+      loop: "{{ ip_addresses1 | zip(range(validators_count)) | list }}"
+      loop_control:
+        label: "{{ item[0] }}"  
 
-####################################################################################################################################
-- name: Golang installation
-  hosts: validator_1,validator_2,validator_3
+   
+  
+
+- name: Installations
+  hosts: validators:fullnodes
   vars:
     ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
   tasks:
+
+ 
+
+    - name: sleep for a few seconds
+      command: sleep 20 
+
     - name: Debug the user dir
       debug:
         msg: "User Directory: {{ user_home }}"
@@ -183,9 +222,7 @@
           - gcc
         state: present
 
-- name: Run the commands
-  hosts: validator_1
-  tasks:
+
     - name: Debug the  dir
       debug:
         msg: "User Directory: {{ user_home }}"
@@ -209,313 +246,229 @@
             PATH: "{{ path }}"
             GOPATH: "{{ user_home }}/go"
 
-    - name: Initialize the chain2
-      command: "{{ daemon }} init {{ validator_2_name }} --chain-id {{ chain_id }} --home {{ user_home }}/{{ node_home }}2"
+- name: Setup Validator Nodes 
+  hosts: validator0
+  tasks:
+
+    
+
+    - name: Initialize chain of each server
+      command: "{{ daemon }} init {{ validator_name }}{{ item }} --chain-id {{ chain_id }} --home {{ user_home }}/{{ node_home }}{{ item }}"
       environment:
         PATH: "{{ path }}"
+      loop: "{{ range(1, validators_count) | list }}"
 
-    - name: Add Keys2
-      command: "{{ daemon }} keys add {{ validator_2_key }} --keyring-backend test --home {{ user_home }}/{{ node_home }}2"
+
+    - name: Initialize chain on each server
+      command: "{{ daemon }} init {{ fullnode_name }}{{ item }} --chain-id {{ chain_id }} --home {{ user_home }}/{{ node_home }}f{{ item }}"
       environment:
         PATH: "{{ path }}"
+      loop: "{{ range(0, fullnode_count) | list }}"
 
-    - name: Add genesis account 2
-      command: "{{ daemon }} genesis add-genesis-account {{ validator_2_key }}  100000000000{{ denom }} --keyring-backend test --home {{ user_home }}/{{ node_home }}2"
-      environment:
-        PATH: "{{ path }}"
 
-    - name: Gentx Command 2
-      command: "{{ daemon }} genesis  gentx {{ validator_2_key }} 90000000000{{ denom }} --chain-id {{ chain_id }} --keyring-backend test --home {{ user_home }}/{{ node_home }}2"
-      environment:
-        PATH: "{{ path }}"
+    - name: Change denom to the required denom
+      become: true
+      shell: sed -i $SED_EXT 's/"stake"/"{{ denom }}"/' {{ user_home }}/{{ node_home }}{{ item }}/config/genesis.json
+      loop: "{{ range(1, validators_count) | list }}"
 
-    - name: Update minimum gas price on validator_2
+    - name: Change denom to the required denom for full node
+      become: true
+      shell: sed -i $SED_EXT 's/"stake"/"{{ denom }}"/' {{ user_home }}/{{ node_home }}f{{ item }}/config/genesis.json
+      loop: "{{ range(0, fullnode_count) | list }}"  
+
+    - name: Replace voting_period value for validators
       lineinfile:
-        path: "{{ user_home }}/{{ node_home }}2/config/app.toml"
+        path: "{{ user_home }}/{{ node_home }}{{ item }}/config/genesis.json"
+        regexp: '^(\s*)"voting_period":\s*".*?",'
+        line: '"voting_period": "{{ voting_period }}",'
+      loop: "{{ range(1, validators_count) | list }}"  
+
+    - name: Replace voting_period value for fullnodes
+      lineinfile:
+        path: "{{ user_home }}/{{ node_home }}f{{ item }}/config/genesis.json"
+        regexp: '^(\s*)"voting_period":\s*".*?",'
+        line: '"voting_period": "{{ voting_period }}",'
+      loop: "{{ range(0, fullnode_count) | list }}"  
+
+
+    - name: Replace expediated voting_period value for validators
+      lineinfile:
+        path: "{{ user_home }}/{{ node_home }}{{ item }}/config/genesis.json"
+        regexp: '^(\s*)"expedited_voting_period":\s*".*?",'
+        line: '"expedited_voting_period": "{{ expedited_voting_period }}",'
+      loop: "{{ range(1, validators_count) | list }}"
+
+    - name: Replace expediated voting_period value for fullnodes
+      lineinfile:
+        path: "{{ user_home }}/{{ node_home }}f{{ item }}/config/genesis.json"
+        regexp: '^(\s*)"expedited_voting_period":\s*".*?",'
+        line: '"expedited_voting_period": "{{ expedited_voting_period }}",'
+      loop: "{{ range(0, fullnode_count) | list }}"  
+
+    - name: Update "amount" value in the JSON file for Validators
+      become: true
+      shell: |
+        jq '.app_state.gov.params.min_deposit[0].amount = "{{ min_deposit_value }}"' {{ user_home }}/{{ node_home }}{{ item }}/config/genesis.json > temp.json && mv temp.json {{ user_home }}/{{ node_home }}{{ item }}/config/genesis.json
+      loop: "{{ range(1, validators_count) | list }}"
+
+
+    - name: Update "amount" value in the JSON file for fullnodes
+      become: true
+      shell: |
+        jq '.app_state.gov.params.min_deposit[0].amount = "{{ min_deposit_value }}"' {{ user_home }}/{{ node_home }}f{{ item }}/config/genesis.json > temp1.json && mv temp1.json {{ user_home }}/{{ node_home }}f{{ item }}/config/genesis.json
+      loop: "{{ range(0, fullnode_count) | list }}"  
+
+  
+    - name: Add Keys for Validators
+      command: "{{ daemon }} keys add {{ validator_key }} --keyring-backend test --home {{ user_home }}/{{ node_home }}{{ item }}"
+      environment:
+        PATH: "{{ path }}"
+      loop: "{{ range(1, validators_count) | list }}"  
+
+
+    - name: Add Keys for fullnodes
+      command: "{{ daemon }} keys add {{ fullnode_key }}{{ item }} --keyring-backend test --home {{ user_home }}/{{ node_home }}f{{ item }}"
+      environment:
+        PATH: "{{ path }}"
+      loop: "{{ range(0, fullnode_count) | list }}"
+
+    - name: Add genesis account  for validators
+      become: true
+      command: "{{ daemon }} genesis add-genesis-account {{ validator_key }}  100000000000{{ denom }} --keyring-backend test --home {{ user_home }}/{{ node_home }}{{ item }}"
+      environment:
+        PATH: "{{ path }}"
+      loop: "{{ range(1, validators_count) | list }}"  
+
+
+    - name: Add genesis account for fullnodes
+      become: true
+      command: "{{ daemon }} genesis add-genesis-account {{ fullnode_key }}{{ item }}  100000000000{{ denom }} --keyring-backend test --home {{ user_home }}/{{ node_home }}f{{ item }}"
+      environment:
+        PATH: "{{ path }}"  
+      loop: "{{ range(0, fullnode_count) | list }}"
+
+    - name: Gentx Command 
+      command: "{{ daemon }} genesis  gentx {{ validator_key }} 90000000000{{ denom }} --chain-id {{ chain_id }} --keyring-backend test --home {{ user_home }}/{{ node_home }}{{ item }}"
+      environment:
+        PATH: "{{ path }}"
+      loop: "{{ range(1, validators_count) | list }}"  
+
+
+    - name: Update minimum gas price for validators
+      lineinfile:
+        path: "{{ user_home }}/{{ node_home }}{{ item }}/config/app.toml"
         regexp: "^minimum-gas-prices ="
         line: 'minimum-gas-prices = "{{ minimum_gas_price }}"'
         state: present
-      when: minimum_gas_price is defined
+      loop: "{{ range(1, validators_count) | list }}" 
 
-    - name: Retrieve the validator_2 address
+    - name: Update minimum gas price for fullnodes
       become: true
-      shell: "{{ daemon }} keys show -a {{ validator_2_key }} --keyring-backend test --home {{ user_home }}/{{ node_home }}2"
-      register: sub1_addr
-      environment:
-        PATH: "{{ path }}"
-        HOME: "{{ user_home }}"
-
-    - name: Initialize the chain3
-      command: "{{ daemon }} init {{ validator_3_name }} --chain-id {{ chain_id }} --home {{ user_home }}/{{ node_home }}3"
-      environment:
-        PATH: "{{ path }}"
-
-    - name: Add Keys3
-      command: "{{ daemon }} keys add {{ validator_3_key }} --keyring-backend test --home {{ user_home }}/{{ node_home }}3"
-      environment:
-        PATH: "{{ path }}"
-
-    - name: Add genesis account 3
-      command: "{{ daemon }} genesis add-genesis-account {{ validator_3_key }}  100000000000{{ denom }} --keyring-backend test --home {{ user_home }}/{{ node_home }}3"
-      environment:
-        PATH: "{{ path }}"
-
-    - name: Gentx Command 3
-      command: "{{ daemon }} genesis  gentx {{ validator_3_key }} 90000000000{{ denom }} --chain-id {{ chain_id }} --keyring-backend test --home {{ user_home }}/{{ node_home }}3"
-      environment:
-        PATH: "{{ path }}"
-
-    - name: Retrieve the validator_3 address
-      become: true
-      shell: "{{ daemon }} keys show -a {{ validator_3_key }} --keyring-backend test --home {{ user_home }}/{{ node_home }}3"
-      register: sub2_addr
-      environment:
-        PATH: "{{ path }}"
-        HOME: "{{ user_home }}"
-
-    - name: Update minimum gas price on validator_3
       lineinfile:
-        path: "{{ user_home }}/{{ node_home }}3/config/app.toml"
+        path: "{{ user_home }}/{{ node_home }}f{{ item }}/config/app.toml"
         regexp: "^minimum-gas-prices ="
         line: 'minimum-gas-prices = "{{ minimum_gas_price }}"'
         state: present
-      when: minimum_gas_price is defined
+      loop: "{{ range(0, fullnode_count) | list }}"
 
-    - name: Initialize the main chain
-      command: "{{ daemon }} init {{ validator_1_name }} --chain-id {{ chain_id }} --home {{ user_home }}/{{ node_home }}"
+    - name: Retrieve the validator address
+      become: true
+      shell: "{{ daemon }} keys show -a {{ validator_key }} --keyring-backend test --home {{ user_home }}/{{ node_home }}{{ item }}"
+      register: validator_addresses
+      environment:
+        PATH: "{{ path }}"
+        HOME: "{{ user_home }}"
+      loop: "{{ range(1, validators_count) | list }}"
+
+
+    - name: Retrieve the full node address
+      become: true
+      shell: "{{ daemon }} keys show -a {{ fullnode_key }}{{ item }} --keyring-backend test --home {{ user_home }}/{{ node_home }}f{{ item }}"
+      register: fullnode_addresses
+      environment:
+        PATH: "{{ path }}"
+        HOME: "{{ user_home }}"
+      loop: "{{ range(0, fullnode_count) | list }}"
+
+    - name: Set fact for validator addresses
+      set_fact:
+        validator_addresses_dict: "{{ validator_addresses_dict | default({}) | combine({item.item: item.stdout}) }}"
+      loop: "{{ validator_addresses.results }}"
+
+    - name: Set fact for fullnode addresses
+      set_fact:
+        fullnode_addresses_dict: "{{ fullnode_addresses_dict | default({}) | combine({item.item: item.stdout}) }}"
+      loop: "{{ fullnode_addresses.results }}"  
+
+    - name: Initialize base validator
+      command: "{{ daemon }} init {{ validator_name }} --chain-id {{ chain_id }} --home {{ user_home }}/{{ node_home }}"
       environment:
         PATH: "{{ path }}"
 
     - name: Change denom to the required denom
       become: true
-      shell: sed -i $SED_EXT 's/"stake"/"{{ denom }}"/' {{ user_home }}/{{ node_home }}/config/genesis.json
+      shell: sed -i $SED_EXT 's/"stake"/"{{ denom }}"/' {{ user_home }}/{{ node_home }}/config/genesis.json    
 
-    - name: Replace voting_period value
-      lineinfile:
-        path: "{{ user_home }}/{{ node_home }}/config/genesis.json"
-        regexp: '^(\s*)"voting_period":\s*".*?",'
-        line: '"voting_period": "{{ voting_period }}",'
-
-    - name: Replace expediated voting_period value
-      lineinfile:
-        path: "{{ user_home }}/{{ node_home }}/config/genesis.json"
-        regexp: '^(\s*)"expedited_voting_period":\s*".*?",'
-        line: '"expedited_voting_period": "{{ expedited_voting_period }}",'
-
-    - name: Update "amount" value in the JSON file
-      become: true
-      shell: |
-        jq '.app_state.gov.params.min_deposit[0].amount = "{{ min_deposit_value }}"' {{ user_home }}/{{ node_home }}/config/genesis.json > temp.json && mv temp.json {{ user_home }}/{{ node_home }}/config/genesis.json
-
-    - name: Add Keys1
-      command: "{{ daemon }} keys add {{ validator_1_key }} --keyring-backend test --home {{ user_home }}/{{ node_home }}"
+    - name: Add Keys
+      command: "{{ daemon }} keys add {{ validator_key }} --keyring-backend test --home {{ user_home }}/{{ node_home }}"
       environment:
         PATH: "{{ path }}"
 
-    - name: Add genesis account 1
+    - name: Add genesis account 
       become: true
-      command: "{{ daemon }} genesis add-genesis-account {{ validator_1_key }}  100000000000{{ denom }} --keyring-backend test --home {{ user_home }}/{{ node_home }}"
+      command: "{{ daemon }} genesis add-genesis-account {{ validator_key }}  100000000000{{ denom }} --keyring-backend test --home {{ user_home }}/{{ node_home }}"
       environment:
         PATH: "{{ path }}"
-
-    - name: Debug sub1 addr
-      debug:
-        var: sub1_addr.stdout
-
-    - name: Debug sub2 addr
-      debug:
-        var: sub2_addr.stdout
-
-    - name: Add genesis account 2 on simapp1
+ 
+    - name: Add all other genesis accounts on main validator
       become: true
-      command: "{{ daemon }} genesis add-genesis-account {{ sub1_addr.stdout }}  100000000000{{ denom }} --keyring-backend test"
+      command: "{{ daemon }} genesis add-genesis-account {{ item.value }} 100000000000{{ denom }} --keyring-backend test --home {{ user_home }}/{{ node_home }}"
       environment:
         PATH: "{{ path }}"
         HOME: "{{ user_home }}"
+      loop: "{{ validator_addresses_dict | dict2items }}"
 
-    - name: Add genesis account 3 on simapp1
+
+    - name: Add all other full node genesis accounts on main validator
       become: true
-      command: "{{ daemon }} genesis add-genesis-account {{ sub2_addr.stdout }}  100000000000{{ denom }} --keyring-backend test"
+      command: "{{ daemon }} genesis add-genesis-account {{ item.value }} 100000000000{{ denom }} --keyring-backend test --home {{ user_home }}/{{ node_home }}"
       environment:
         PATH: "{{ path }}"
         HOME: "{{ user_home }}"
+      loop: "{{ fullnode_addresses_dict | dict2items }}"  
 
-    - name: Gentx Command 1
-      become: true
-      command: "{{ daemon }} genesis  gentx {{ validator_1_key }} 90000000000{{ denom }} --chain-id {{ chain_id }} --keyring-backend test --home {{ user_home }}/{{ node_home }}"
+    - name: Gentx Command 
+      command: "{{ daemon }} genesis  gentx {{ validator_key }} 90000000000{{ denom }} --chain-id {{ chain_id }} --keyring-backend test --home {{ user_home }}/{{ node_home }}"
       environment:
         PATH: "{{ path }}"
 
-    - name: Copy validator 2 gentx file into the validator 1 gentx folder
+    - name: Copy  other validator gentx file into the validator 1 gentx folder
       become: true
-      shell: "sudo cp {{ user_home }}/{{ node_home }}2/config/gentx/* {{ user_home }}/{{ node_home }}/config/gentx"
+      shell: "sudo cp {{ user_home }}/{{ node_home }}{{ item }}/config/gentx/* {{ user_home }}/{{ node_home }}/config/gentx"   
+      loop: "{{ range(1, validators_count) | list }}"  
 
-    - name: Copy validator 3 gentx file into the validator 1 gentx folder
-      become: true
-      shell: "sudo cp {{ user_home }}/{{ node_home }}3/config/gentx/* {{ user_home }}/{{ node_home }}/config/gentx"
-
-    - name: Update minimum gas price on validator_1
-      become: true
+    - name: Update minimum gas price on main validator
       lineinfile:
         path: "{{ user_home }}/{{ node_home }}/config/app.toml"
         regexp: "^minimum-gas-prices ="
         line: 'minimum-gas-prices = "{{ minimum_gas_price }}"'
         state: present
-      when: minimum_gas_price is defined
 
     - name: Collect gentxs
       become: true
       command: "{{ daemon }} genesis  collect-gentxs --home {{ user_home }}/{{ node_home }}"
       environment:
-        PATH: "{{ path }}"
+        PATH: "{{ path }}"  
 
-    - name: Setup cosmovisor for validator_1
-      become: true
-      shell: "go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest &&  mkdir -p {{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin && mkdir -p {{ user_home }}/{{ node_home }}/cosmovisor/upgrades && cp $GOPATH/bin/{{ daemon }} {{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin/{{ daemon }}"
-      environment:
-        GOPATH: "{{ user_home }}/go"
-        PATH: "{{ path }}"
 
-    - name: Change ownership of cosmovisor directory
-      become: true
-      command: "chown -R {{ ansible_user }}:{{ ansible_user }} {{ user_home }}/{{ node_home }}/cosmovisor"
-
-    - name: Compress simapp2 directory
-      become: true
-      archive:
-        path: "{{ user_home }}/{{ node_home }}2"
-        dest: "{{ user_home }}/simapp2.tar.gz"
-
-    - name: Fetch simapp2 for validator_2
-      become: true
-      fetch:
-        src: "{{ user_home }}/simapp2.tar.gz"
-        dest: "{{ playbook_dir }}/simapp2.tar.gz"
-        flat: yes
-
-    - name: Compress simapp3 directory
-      become: true
-      archive:
-        path: "{{ user_home }}/{{ node_home }}3"
-        dest: "{{ user_home }}/simapp3.tar.gz"
-
-    - name: Fetch simapp3 for validator_3
-      become: true
-      fetch:
-        src: "{{ user_home }}/simapp3.tar.gz"
-        dest: "{{ playbook_dir }}/simapp3.tar.gz"
-        flat: yes
-
-- name: Copy simapp2 on validator_2
-  hosts: validator_2
-  tasks:
-    - name: Send the simapp2 to validator_2 server
-      copy:
-        src: "{{ playbook_dir }}/simapp2.tar.gz"
-        dest: "{{ user_home }}/simapp2.tar.gz"
-
-    - name: Unarchive the simapp2.gz file
-      become: true
-      unarchive:
-        src: "{{ user_home }}/simapp2.tar.gz"
-        dest: "{{ user_home }}"
-        remote_src: yes
-
-- name: Copy simapp3 on validator_3
-  hosts: validator_3
-  tasks:
-    - name: Send the simapp3 to validator_3 server
-      copy:
-        src: "{{ playbook_dir }}/simapp3.tar.gz"
-        dest: "{{ user_home }}/simapp3.tar.gz"
-
-    - name: Unarchive the simapp3.gz file
-      become: true
-      unarchive:
-        src: "{{ user_home }}/simapp3.tar.gz"
-        dest: "{{ user_home }}"
-        remote_src: yes
-
-- name: extract and replace the genesis
-  hosts: validator_1
-  tasks:
     - name: Fetch genesis.json from
       become: true
       fetch:
         src: "{{ node_home }}/config/genesis.json"
         dest: "{{ playbook_dir }}/genesis.json"
-        flat: yes
+        flat: yes     
 
-    - name: Debug the ansible user
-      debug:
-        msg: "Ansible User: {{ ansible_user }}"
-
-    - name: Debug the user dir
-      debug:
-        msg: "User Directory: {{ user_home }}"
-
-    - name: Extract node-id for validator_1
-      become: true
-      command: "{{ daemon }} tendermint show-node-id"
-      register: m_node_id
-      environment:
-        PATH: "{{ path }}"
-        HOME: "{{ user_home }}"
-
-- name: Changing the existing sub genesis.json to the actual genesis.json
-  hosts: validator_2
-  tasks:
-    - name: Replace the existing genesis.json
-      become: true
-      copy:
-        src: "{{ playbook_dir }}/genesis.json"
-        dest: "{{ user_home }}/{{ node_home }}2/config/genesis.json"
-
-- name: Changing the existing sub genesis.json to the actual genesis.json
-  hosts: validator_3
-  tasks:
-    - name: Replace the existing genesis.json
-      become: true
-      copy:
-        src: "{{ playbook_dir }}/genesis.json"
-        dest: "{{ user_home }}/{{ node_home }}3/config/genesis.json"
-
-- name: Install prerequisites on validator_2,validator_3
-  hosts: validator_2,validator_3
-  tasks:
-    - name: Debug the user dir
-      debug:
-        msg: "User Directory: {{ user_home }}"
-
-    - name: Install the binary
-      become: true
-      block:
-        - name: Clone the git repo
-          git:
-            repo: "{{ repo }}"
-            dest: "{{ user_home }}/{{ network }}"
-            version: "{{ node_version }}"
-            update: yes
-            force: yes
-
-        - name: Install node
-          become: true
-          command: "make install"
-          args:
-            chdir: "{{ user_home }}/{{ network }}"
-          environment:
-            PATH: "{{ path }}"
-            GOPATH: "{{ user_home }}/go"
-          when: binary is undefined
-
-- name: Replace dir on validator_2
-  hosts: validator_2
-  tasks:
-    - name: Remove the existing simapp and rename simapp2 to simapp
-      become: true
-      shell: "rm -rf {{ node_home }} && mv {{ node_home }}2 {{ node_home }}"
-
-    - name: Setup cosmovisor for validator_2
+    - name: Setup cosmovisor for main validator
       become: true
       shell: "go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest &&  mkdir -p {{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin && mkdir -p {{ user_home }}/{{ node_home }}/cosmovisor/upgrades && cp $GOPATH/bin/{{ daemon }} {{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin/{{ daemon }}"
       environment:
@@ -526,73 +479,161 @@
       become: true
       command: "chown -R {{ ansible_user }}:{{ ansible_user }} {{ user_home }}/{{ node_home }}/cosmovisor"
 
-    - name: Extract node-id for validator_2
-      become: true
-      shell: "{{ daemon }} tendermint show-node-id"
-      register: s1_node_id
-      environment:
-        PATH: "{{ path }}"
-        HOME: "{{ user_home }}"
+################################################################################################################################      
 
-- name: Replace dir on validator_3
-  hosts: validator_3
+    - name: Compress other validators binary directories
+      become: true
+      archive:
+        path: "{{ user_home }}/{{ node_home }}{{ item }}"
+        dest: "{{ user_home }}/simapp{{ item }}.tar.gz" 
+      loop: "{{ range(1, validators_count) | list }}"  
+
+    - name: Fetch binaries for validators
+      become: true
+      fetch:
+        src: "{{ user_home }}/simapp{{ item }}.tar.gz"
+        dest: "{{ playbook_dir }}/simapp{{ item }}.tar.gz"
+        flat: yes  
+      loop: "{{ range(1, validators_count) | list }}" 
+
+    - name: Compress other fullnode binary directories
+      become: true
+      archive:
+        path: "{{ user_home }}/{{ node_home }}f{{ item }}"
+        dest: "{{ user_home }}/simappf{{ item }}.tar.gz" 
+      loop: "{{ range(0, fullnode_count) | list }}"
+
+    - name: Fetch binaries for fullnodes
+      become: true
+      fetch:
+        src: "{{ user_home }}/simappf{{ item }}.tar.gz"
+        dest: "{{ playbook_dir }}/simappf{{ item }}.tar.gz"
+        flat: yes  
+      loop: "{{ range(0, fullnode_count) | list }}"
+
+- name: Copying the binaries to their respective servers 
+  hosts: validators
+  vars: 
+    validator0_ip: "{{ hostvars['validator0']['ansible_host'] }}"
+    validator1_ip: "{{ hostvars['validator1']['ansible_host'] }}"
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+  
   tasks:
-    - name: Remove the existing simapp and rename simapp3 to simapp
-      become: true
-      shell: "rm -rf {{ node_home }} && mv {{ node_home }}3 {{ node_home }}"
+    
 
-    - name: Setup cosmovisor for validator_3
+    - name: Send the binaries to respective  validators server
+      copy:
+        src: "{{ playbook_dir }}/simapp{{ item }}.tar.gz"
+        dest: "{{ user_home }}/simapp.tar.gz"
+      loop: "{{ range(1, validators_count) | list }}"
+      when: "inventory_hostname == groups['validators'][item]"   
+
+    
+    - name: Unarchive the binary file
       become: true
-      shell: go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest &&  mkdir -p {{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin && mkdir -p {{ user_home }}/{{ node_home }}/cosmovisor/upgrades && cp $GOPATH/bin/{{ daemon }} {{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin/{{ daemon }}
+      unarchive:
+        src: "{{ user_home }}/simapp.tar.gz"
+        dest: "{{ user_home }}" 
+        remote_src: yes 
+      loop: "{{ range(1, validators_count) | list }}"
+      when: "inventory_hostname == groups['validators'][item]"  
+
+    - name: Move simapps to .simapp
+      become: true
+      command: mv .simapp{{ item }}  .simapp
+      loop: "{{ range(1, validators_count) | list }}"
+      when: "inventory_hostname == groups['validators'][item]"
+
+
+    - name: Replace the existing genesis.json
+      become: true
+      copy:
+        src: "{{ playbook_dir }}/genesis.json"
+        dest: "{{ user_home }}/{{ node_home }}/config/genesis.json" 
+      loop: "{{ range(1, validators_count) | list }}"   
+
+    - name: Setup cosmovisor for validators
+      become: true
+      shell: "go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest &&  mkdir -p {{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin && mkdir -p {{ user_home }}/{{ node_home }}/cosmovisor/upgrades && cp $GOPATH/bin/{{ daemon }} {{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin/{{ daemon }}"
       environment:
         GOPATH: "{{ user_home }}/go"
         PATH: "{{ path }}"
+      loop: "{{ range(1, validators_count) | list }}"
 
     - name: Change ownership of cosmovisor directory
       become: true
       command: "chown -R {{ ansible_user }}:{{ ansible_user }} {{ user_home }}/{{ node_home }}/cosmovisor"
+      loop: "{{ range(1, validators_count) | list }}"
 
-    - name: Extract node-id for validator_3
+
+    - name: Extract node-id for all  validators
       become: true
       shell: "{{ daemon }} tendermint show-node-id"
-      register: s2_node_id
+      register: node_ids
       environment:
         PATH: "{{ path }}"
-        HOME: "{{ user_home }}"
+        HOME: "{{ user_home }}"    
+      loop: "{{ range(0, 2) | list }}"  
 
-- name: Add persistent peer
-  hosts: validator_1
-  tasks:
-    - name: Add persistant  peer for validator_1 node
+    - name: Set fact for node-id  addresses
+      set_fact:
+        node_ids_dict: "{{ node_ids_dict | default({}) | combine({item.item : item.stdout}) }}"
+      loop: "{{ node_ids.results }}"
+    
+     
+
+
+    - name: Debug node id 0
+      debug: 
+        var: node_ids_dict[0]
+    - name: Debug node id 1
+      debug: 
+        var: node_ids_dict[1]   
+
+    - name: Add persistant  peer for validator nodes
       become: true
       lineinfile:
         path: "{{ node_home }}/config/config.toml"
         regexp: "^persistent_peers ="
-        line: 'persistent_peers = "{{ hostvars["validator_2"]["s1_node_id"]["stdout"] }}@{{ validator2_ip }}:26656,{{ hostvars["validator_3"]["s2_node_id"]["stdout"] }}@{{ validator3_ip }}:26656"'
-
-- name: Add persistent peer
-  hosts: validator_2
-  tasks:
-    - name: Add persistant  peer for validator_2 node
+        line: 'persistent_peers = "{{ hostvars["validator0"]["node_ids_dict"][0] }}@{{ validator0_ip }}:26656,{{ hostvars["validator1"]["node_ids_dict"][1] }}@{{ validator1_ip }}:26656"'
+      loop: "{{ range(0, validators_count) | list }}"
+ 
+    - name: Make rpc publicly accessible
       become: true
       lineinfile:
         path: "{{ node_home }}/config/config.toml"
-        regexp: "^persistent_peers ="
-        line: 'persistent_peers = "{{ hostvars["validator_1"]["m_node_id"]["stdout"] }}@{{ validator1_ip }}:26656,{{ hostvars["validator_3"]["s2_node_id"]["stdout"] }}@{{ validator3_ip }}:26656"'
+        regexp: 'laddr = "tcp://127.0.0.1:26657"'
+        line: 'laddr = "tcp://0.0.0.0:26657"'  
 
-- name: Add persistent peer
-  hosts: validator_3
-  tasks:
-    - name: Add persistant  peer for validator_3 node
+    - name: replace localhost under api section
+      become: true
+      replace:
+        path: "{{ node_home }}/config/app.toml"
+        regexp: 'address = "tcp://localhost:1317"'
+        replace: 'address = "tcp://0.0.0.0:1317"'  
+
+    - name: Making the change in the CORS section of config.toml
       become: true
       lineinfile:
         path: "{{ node_home }}/config/config.toml"
-        regexp: "^persistent_peers ="
-        line: 'persistent_peers = "{{ hostvars["validator_1"]["m_node_id"]["stdout"] }}@{{ validator1_ip }}:26656,{{ hostvars["validator_2"]["s1_node_id"]["stdout"] }}@{{ validator2_ip }}:26656"'
+        regexp: 'cors_allowed_origins = \[\]'
+        line: 'cors_allowed_origins = ["*"]'
 
-- name: Copy the node service file and start it
-  hosts: validator_1,validator_2,validator_3
-  tasks:
+    - name: Making the change in the CORS section of app.toml
+      become: true
+      lineinfile:
+        path: "{{ node_home }}/config/app.toml"
+        regexp: "enabled-unsafe-cors = false"
+        line: "enabled-unsafe-cors = true"
+
+    - name: set enable to true under api section
+      become: true
+      replace:
+        path: "{{ node_home }}/config/app.toml"
+        regexp: '(?ms)(\[api\][^\[]*enable\s*=\s*)false'
+        replace: '\1true'     
+
+   
     - name: Copy the service file
       become: true
       template:
@@ -611,11 +652,235 @@
 
     - name: Restart the journald service file
       become: true
-      shell: systemctl restart systemd-journald.service
+      shell: systemctl restart systemd-journald.service 
 
-- name: Install dependencies
-  hosts: validator_1
+    - name: Extract persistent_peers from config.toml
+      shell: grep '^persistent_peers =' {{ node_home }}/config/config.toml | head -n 1
+      register: persistent_peers_content
+      run_once: true
+
+    - name: Save persistent_peers to a file on the remote host
+      copy:
+        content: "{{ persistent_peers_content.stdout }}"
+        dest: "{{ user_home }}/persistent_peers.txt"
+      run_once: true  
+
+    - name: Fetch persistent_peers file to the control node
+      fetch:
+        src: "{{ user_home }}/persistent_peers.txt"
+        dest: "{{ playbook_dir }}/persistent_peers.txt"
+        flat: yes
+      run_once: true
+
+- name: Copy the binaries to the other  full nodes
+  hosts: fullnodes
+  vars: 
+    validator0_ip: "{{ hostvars['validator0']['ansible_host'] }}"
+    validator1_ip: "{{ hostvars['validator1']['ansible_host'] }}"
   tasks:
+
+    - name: Disable host key checking
+      set_fact:
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+
+    - name: Send the binaries to respective  fullnode server
+      copy:
+        src: "{{ playbook_dir }}/simappf{{ item }}.tar.gz"
+        dest: "{{ user_home }}/simapp.tar.gz"
+      loop: "{{ range(0, fullnode_count) | list }}"
+      when: "inventory_hostname == groups['fullnodes'][item]"   
+
+    
+    - name: Unarchive the simapp.gz file
+      become: true
+      unarchive:
+        src: "{{ user_home }}/simapp.tar.gz"
+        dest: "{{ user_home }}" 
+        remote_src: yes 
+      loop: "{{ range(0, fullnode_count) | list }}"
+      when: "inventory_hostname == groups['fullnodes'][item]"  
+
+    - name: Move simapps to .simapp
+      become: true
+      command: mv .simappf{{ item }}  .simapp
+      loop: "{{ range(0, fullnode_count) | list }}"
+      when: "inventory_hostname == groups['fullnodes'][item]"
+
+    - name: Replace the existing genesis.json
+      become: true
+      copy:
+        src: "{{ playbook_dir }}/genesis.json"
+        dest: "{{ user_home }}/{{ node_home }}/config/genesis.json" 
+      loop: "{{ range(0, fullnode_count) | list }}"
+
+    - name: Setup cosmovisor for fullnodes
+      become: true
+      shell: "go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest &&  mkdir -p {{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin && mkdir -p {{ user_home }}/{{ node_home }}/cosmovisor/upgrades && cp $GOPATH/bin/{{ daemon }} {{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin/{{ daemon }}"
+      environment:
+        GOPATH: "{{ user_home }}/go"
+        PATH: "{{ path }}"
+      loop: "{{ range(0, fullnode_count) | list }}"
+      when: "inventory_hostname == groups['fullnodes'][item]"  
+
+    - name: Change ownership of cosmovisor directory
+      become: true
+      command: "chown -R {{ ansible_user }}:{{ ansible_user }} {{ user_home }}/{{ node_home }}/cosmovisor"
+      loop: "{{ range(0, fullnode_count) | list }}" 
+      when: "inventory_hostname == groups['fullnodes'][item]"  
+
+    - name: Replace persistent_peers in config.toml with the extracted content
+      replace:
+        path: "{{ node_home }}/config/config.toml"
+        regexp: '^persistent_peers\s*=.*'
+        replace: "{{ lookup('file', '{{ playbook_dir }}/persistent_peers.txt') }}"
+
+
+    - name: Copy the service file
+      become: true
+      template:
+        src: "{{ playbook_dir }}/templates/node-service.j2"
+        dest: "/etc/systemd/system/{{ network }}.service"
+        owner: root
+        group: root
+        mode: "0644"
+      loop: "{{ range(0, fullnode_count) | list }}"
+      when: "inventory_hostname == groups['fullnodes'][item]"  
+
+   
+    - name: Start the service file
+      become: true
+      systemd:
+        name: "{{ network }}"
+        state: started
+        enabled: yes
+      loop: "{{ range(0, fullnode_count) | list }}"
+      when: "inventory_hostname == groups['fullnodes'][item]"  
+
+    - name: Restart the journald service file
+      become: true
+      shell: systemctl restart systemd-journald.service 
+      loop: "{{ range(0, fullnode_count) | list }}"
+      when: "inventory_hostname == groups['fullnodes'][item]" 
+
+- name: Load Balancer Setup
+  hosts: validators
+  tasks:    
+    - name: Debug droplet IDs
+      debug:
+        var: hostvars['localhost']['droplet_ids']
+
+    - name: Create load balancer
+      community.digitalocean.digital_ocean_load_balancer:
+        api_token: "{{ digital_ocean_api_token }}"
+        state: present
+        name: load-balancer-RPC
+        region: "{{ region }}"
+        forwarding_rules:
+          - entry_protocol: http
+            entry_port: 80
+            target_protocol: http
+            target_port: 26657 
+        droplet_ids: "{{ hostvars['localhost']['droplet_ids'] }}"
+        health_check:
+          protocol: "http"         
+          port: 26657               
+          path: "/status"           
+          check_interval_seconds: 10
+          response_timeout_seconds: 5
+          healthy_threshold: 5
+          unhealthy_threshold: 3
+      register: rpc_lb_addr    
+      run_once: true  
+
+    - name: Wait for load balancer to become ready
+      wait_for:
+        timeout: 30
+      run_once: true  
+
+  
+    - name: Get load balancer information by ID
+      community.digitalocean.digital_ocean_load_balancer_info:
+        oauth_token: "{{ digital_ocean_api_token }}"
+        load_balancer_id: "{{ rpc_lb_addr.data.load_balancer.id }}"
+      register: rpc_lb_info
+
+    - name: Debug the contents of rpc_lb_info
+      debug:
+        var: rpc_lb_info  
+
+
+    - name: Show Load Balancer IP address
+      debug:
+        msg: "Load Balancer IP: {{ rpc_lb_info.data[0].ip if rpc_lb_info.data[0].ip is defined else 'IP not available yet' }}"
+
+
+    - name: Set lb1 variable to the RPC load balancer IP address
+      set_fact:
+        lb1: "{{ rpc_lb_info.data[0].ip }}"
+      run_once: true    
+
+    - name: Append RPC load balancer IP address under [loadbalancer] in the inventory file
+      lineinfile:
+        path: "inventory2.ini"
+        insertafter: "^\\[loadbalancer\\]"
+        line: "lb1 ansible_host={{ lb1 }}"
+      run_once: true
+      delegate_to: localhost
+  
+
+    
+    - name: Create load balancer for API endpoint
+      community.digitalocean.digital_ocean_load_balancer:
+        api_token: "{{ digital_ocean_api_token }}"
+        state: present
+        name: load-balancer-API
+        region: "{{ region }}"
+        forwarding_rules:
+          - entry_protocol: http
+            entry_port: 80
+            target_protocol: http
+            target_port: 1317  
+        droplet_ids: "{{ hostvars['localhost']['droplet_ids'] }}"
+        health_check:
+          protocol: "http"         
+          port: 1317               
+          path: "/cosmos/base/tendermint/v1beta1/node_info"           
+          check_interval_seconds: 10
+          response_timeout_seconds: 5
+          healthy_threshold: 5
+          unhealthy_threshold: 3
+      register: api_lb_addr     
+      run_once: true  
+    - name: Wait for load balancer to become ready
+      wait_for:
+        timeout: 30
+      run_once: true  
+
+    - name: Get load balancer information by ID
+      community.digitalocean.digital_ocean_load_balancer_info:
+        oauth_token: "{{ digital_ocean_api_token }}"
+        load_balancer_id: "{{ api_lb_addr.data.load_balancer.id }}"
+      register: api_info
+
+    - name: Show Load Balancer IP address
+      debug:
+        msg: "Load Balancer IP: {{ api_info.data[0].ip if api_info.data[0].ip is defined else 'IP not available yet' }}"
+   
+    - name: Set lb2 variable to the API load balancer IP address
+      set_fact:
+        lb2: "{{ api_info.data[0].ip }}"
+      run_once: true  
+
+    - name: Append API load balancer IP address under [loadbalancer] in the inventory file
+      lineinfile:
+        path: "inventory2.ini"
+        insertafter: "^\\[loadbalancer\\]"
+        line: "lb2 ansible_host={{ lb2 }}"
+      run_once: true  
+      delegate_to: localhost
+   
+
+
     - name: Install nvm
       shell: >
         curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.4/install.sh | bash &&
@@ -664,92 +929,49 @@
         dest: "{{ user_home }}/explorer"
         version: "f35fb4485630a6d80a9246f29e753e9e75fefbd3"
 
-    - name: Make required changes in app and config.toml
-      block:
-        - name: Make rpc publicly accessible
-          become: true
-          lineinfile:
-            path: "{{ user_home }}/{{ node_home }}/config/config.toml"
-            regexp: 'laddr = "tcp://127.0.0.1:26657"'
-            line: 'laddr = "tcp://0.0.0.0:26657"'
+    - name: Install nginx
+      become: true
+      shell: sudo apt install -y nginx
 
-        - name: Making the change in the CORS section of config.toml
-          become: true
-          lineinfile:
-            path: "{{ user_home }}/{{ node_home }}/config/config.toml"
-            regexp: 'cors_allowed_origins = \[\]'
-            line: 'cors_allowed_origins = ["*"]'
+    - name: move into the mainnet and remove the other files
+      shell: rm -rf *
+      args:
+        chdir: "{{ user_home }}/explorer/chains/mainnet"
+      become: yes
 
-        - name: Making the change in the CORS section of app.toml
-          become: true
-          lineinfile:
-            path: "{{ user_home }}/{{ node_home }}/config/app.toml"
-            regexp: "enabled-unsafe-cors = false"
-            line: "enabled-unsafe-cors = true"
+    - name: Copy the sample json file
+      become: true
+      template:
+        src: "{{ playbook_dir }}/templates/explorer-config.j2"
+        dest: "{{ user_home }}/explorer/chains/mainnet/{{ chain_id }}.json"
+      vars:
+        lb1_ip: "{{ lb1 }}"
+        lb2_ip: "{{ lb2 }}"
+     
+    - name: Remove contents of /var/www/html
+      become: true
+      shell: rm -rf *
+      args:
+        chdir: "/var/www/html/"
 
-        - name: set enable to true under api section
-          become: true
-          replace:
-            path: "{{ user_home }}/{{ node_home }}/config/app.toml"
-            regexp: '(?ms)(\[api\][^\[]*enable\s*=\s*)false'
-            replace: '\1true'
+    - name: Debug PATH
+      ansible.builtin.debug:
+        var: ansible_env.PATH
+    - name: Build the explorer
+      become: true
+      shell: >
+        . "{{ user_home }}/.nvm/nvm.sh" && export PATH="{{ ansible_env.PATH }}:{{ user_home }}/.nvm/versions/node/v18.19.0/bin" && cd '{{ user_home }}/explorer' && yarn install --ignore-engines && yarn build
+      args:
+        chdir: "{{ user_home }}/explorer"
 
-        - name: replace localhost under api section
-          become: true
-          replace:
-            path: "{{ user_home }}/{{ node_home }}/config/app.toml"
-            regexp: 'address = "tcp://localhost:1317"'
-            replace: 'address = "tcp://0.0.0.0:1317"'
-
-        - name: Restart the systemd file of the node
-          become: true
-          shell: systemctl restart {{ network }}.service
-
-        - name: Install nginx
-          become: true
-          shell: sudo apt install -y nginx
-
-        - name: move into the mainnet and remove the other files
-          shell: rm -rf *
-          args:
-            chdir: "{{ user_home }}/explorer/chains/mainnet"
-          become: yes
-
-        - name: Copy the sample json file
-          become: true
-          template:
-            src: "{{ playbook_dir }}/templates/explorer-config.j2"
-            dest: "{{ user_home }}/explorer/chains/mainnet/{{ chain_id }}.json"
-
-        - name: Remove contents of /var/www/html
-          become: true
-          shell: rm -rf *
-          args:
-            chdir: "/var/www/html/"
-
-        - name: Debug PATH
-          ansible.builtin.debug:
-            var: ansible_env.PATH
-
-        - name: Build the explorer
-          become: true
-          shell: >
-            . "{{ user_home }}/.nvm/nvm.sh" && export PATH="{{ ansible_env.PATH }}:{{ user_home }}/.nvm/versions/node/v18.19.0/bin" && cd '{{ user_home }}/explorer' && yarn install --ignore-engines && yarn build
-          args:
-            chdir: "{{ user_home }}/explorer"
-
-        - name: Move the data inside dist folder to /var/www/html
-          become: true
-          shell: cp -r dist/* /var/www/html/
-          args:
-            chdir: "{{ user_home }}/explorer"
-
-        - name: Restart the journald service file
-          become: true
-          shell: systemctl restart systemd-journald.service
+    - name: Move the data inside dist folder to /var/www/html
+      become: true
+      shell: cp -r dist/* /var/www/html/
+      args:
+        chdir: "{{ user_home }}/explorer"
 
 - name: Faucet related tasks
-  hosts: validator_1
+  hosts: validators
   tasks:
     - name: Install the faucet
       become: true
@@ -768,6 +990,8 @@
       template:
         src: "{{ playbook_dir }}/templates/faucet-config.j2"
         dest: "{{ user_home }}/faucet/config.js"
+      vars:
+        lb1_ip: "{{ lb1 }}"  
 
     - name: Install express using npm
       become: true
@@ -816,10 +1040,12 @@
 
     - name: Add the faucet address to the keyring
       become: true
-      shell: "echo '{{ faucet_mnemonic.stdout }}' | {{ daemon }} keys add faucet --recover --keyring-backend test"
+      shell: "echo '{{ faucet_mnemonic.stdout }}' | {{ daemon }} keys add faucet{{ item }} --recover --keyring-backend test"
       environment:
         PATH: "{{ path }}"
         HOME: "{{ user_home }}"
+      loop: "{{ range(0, validators_count) | list }}"
+      when: "inventory_hostname == groups['validators'][item]"    
       become_user: "{{ ansible_user }}"
       become_method: sudo
 
@@ -829,7 +1055,7 @@
       environment:
         PATH: "{{ path }}"
 
-    - name: Debug te keyring output
+    - name: Debug the keyring output
       debug:
         var: list_key.stdout_lines
 
@@ -837,15 +1063,129 @@
       debug:
         msg: "User Directory: {{ user_home }}"
 
-    - name: Retrieve the faucet address
+    - name: Retrieve the faucet addresses for all validators
       become: true
-      shell: "{{ daemon }} keys show -a faucet --keyring-backend test"
-      register: faucet_addr
+      shell: "{{ daemon }} keys show -a faucet{{ item }} --keyring-backend test"
+      register: faucet_addr_results
       environment:
         PATH: "{{ path }}"
         HOME: "{{ user_home }}"
+      loop: "{{ range(0, validators_count) | list }}"
+      when: inventory_hostname == groups['validators'][item]
 
+    - name: Debug the faucet_addr_results
+      debug:
+        var: faucet_addr_results  
+
+    - name: Store faucet addresses in a dictionary
+      set_fact:
+        faucet_addresses: "{{ faucet_addresses | default({}) | combine({item: (faucet_addr_results.results[item].stdout if 'stdout' in faucet_addr_results.results[item] else 'skipped') }) }}"
+      loop: "{{ range(0, validators_count) | list }}"
+
+    - name: Debug the faucet addresses
+      debug:
+        var: faucet_addresses  
+    
     - name: Transfer funds from genesis account to the faucet account
-      shell: "{{ daemon }} tx bank send {{ validator_1_key }} {{ faucet_addr.stdout }}  10000000000{{ denom }} --keyring-backend test --chain-id {{ chain_id }} -y"
+      shell: "{{ daemon }} tx bank send {{ validator_key }} {{ faucet_addr_results.results[item].stdout }} 10000000000{{ denom }} --keyring-backend test --chain-id {{ chain_id }} -y"
       environment:
         PATH: "{{ path }}"
+      loop: "{{ range(0, validators_count) | list }}"
+      when: inventory_hostname == groups['validators'][item]
+
+    - name: Create load balancer for the explorer and faucet
+      community.digitalocean.digital_ocean_load_balancer:
+        api_token: "{{ digital_ocean_api_token }}"
+        state: present
+        name: explorer-loadbalancer
+        region: "{{ region }}"
+        forwarding_rules:
+          - entry_protocol: http
+            entry_port: 80
+            target_protocol: http
+            target_port: 80
+
+          - entry_protocol: http
+            entry_port: 83
+            target_protocol: http
+            target_port: 83      
+        droplet_ids: "{{ hostvars['localhost']['droplet_ids'] }}"
+        health_check:
+          protocol: "http"         
+          port: 83            
+          path: "/"           
+          check_interval_seconds: 10
+          response_timeout_seconds: 5
+          healthy_threshold: 5
+          unhealthy_threshold: 3
+      when: inventory_hostname == "validator0" 
+
+- name: Remove the files from playbook_dir
+  hosts: localhost
+  tasks:      
+
+    - name: Remove simapp.tar.gz files of each full node
+      file:
+        path: "{{ playbook_dir }}/simappf{{ item }}.tar.gz"
+        state: absent
+      loop: "{{ range(0, fullnode_count) | list }}"
+
+    - name: Remove simapp.tar.gz files of each validator 
+      file:
+        path: "{{ playbook_dir }}/simapp{{ item }}.tar.gz"
+        state: absent
+      loop: "{{ range(1, validators_count) | list }}"  
+
+    - name: Remove the genesis.json from the playbook_dir
+      file: 
+        path: "{{ playbook_dir }}/genesis.json"
+        state: absent  
+
+    - name: Remove the persistant peers.txt from the playbook_dir
+      file: 
+        path: "{{ playbook_dir }}/persistent_peers.txt"
+        state: absent     
+   
+
+
+  
+    
+
+  
+
+   
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+    
+
+    
+
+   
+
+
+
+
+            
+
+   
+
