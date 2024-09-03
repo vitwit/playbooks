@@ -485,14 +485,14 @@
       become: true
       archive:
         path: "{{ user_home }}/{{ node_home }}{{ item }}"
-        dest: "{{ user_home }}/simapp{{ item }}.tar.gz" 
+        dest: "{{ user_home }}/{{ node_home }}{{ item }}.tar.gz" 
       loop: "{{ range(1, validators_count) | list }}"  
 
     - name: Fetch binaries for validators
       become: true
       fetch:
-        src: "{{ user_home }}/simapp{{ item }}.tar.gz"
-        dest: "{{ playbook_dir }}/simapp{{ item }}.tar.gz"
+        src: "{{ user_home }}/{{ node_home }}{{ item }}.tar.gz"
+        dest: "{{ playbook_dir }}/{{ node_home }}{{ item }}.tar.gz"
         flat: yes  
       loop: "{{ range(1, validators_count) | list }}" 
 
@@ -500,16 +500,31 @@
       become: true
       archive:
         path: "{{ user_home }}/{{ node_home }}f{{ item }}"
-        dest: "{{ user_home }}/simappf{{ item }}.tar.gz" 
+        dest: "{{ user_home }}/{{ node_home }}f{{ item }}.tar.gz" 
       loop: "{{ range(0, fullnode_count) | list }}"
 
     - name: Fetch binaries for fullnodes
       become: true
       fetch:
-        src: "{{ user_home }}/simappf{{ item }}.tar.gz"
-        dest: "{{ playbook_dir }}/simappf{{ item }}.tar.gz"
+        src: "{{ user_home }}/{{ node_home }}f{{ item }}.tar.gz"
+        dest: "{{ playbook_dir }}/{{ node_home }}f{{ item }}.tar.gz"
         flat: yes  
       loop: "{{ range(0, fullnode_count) | list }}"
+
+    - name: Remove the fullnode tar files
+      become: true
+      command: rm -rf {{ node_home }}f{{ item }}.tar.gz  
+      loop: "{{ range(0, fullnode_count) | list }}"
+
+    - name: Remove the validator tar files
+      become: true
+      command: rm -rf {{ node_home }}{{ item }}.tar.gz 
+      loop: "{{ range(1, validators_count) | list }}" 
+
+    - name: Remove the  other validator  files
+      become: true
+      command: rm -rf {{ node_home }}{{ item }}
+      loop: "{{ range(1, validators_count) | list }}"   
 
 - name: Copying the binaries to their respective servers 
   hosts: validators
@@ -523,8 +538,8 @@
 
     - name: Send the binaries to respective  validators server
       copy:
-        src: "{{ playbook_dir }}/simapp{{ item }}.tar.gz"
-        dest: "{{ user_home }}/simapp.tar.gz"
+        src: "{{ playbook_dir }}/{{ node_home }}{{ item }}.tar.gz"
+        dest: "{{ user_home }}/{{ node_home }}.tar.gz"
       loop: "{{ range(1, validators_count) | list }}"
       when: "inventory_hostname == groups['validators'][item]"   
 
@@ -532,15 +547,15 @@
     - name: Unarchive the binary file
       become: true
       unarchive:
-        src: "{{ user_home }}/simapp.tar.gz"
+        src: "{{ user_home }}/{{ node_home }}.tar.gz"
         dest: "{{ user_home }}" 
         remote_src: yes 
       loop: "{{ range(1, validators_count) | list }}"
       when: "inventory_hostname == groups['validators'][item]"  
 
-    - name: Move simapps to .simapp
+    - name: Move binaries 
       become: true
-      command: mv .simapp{{ item }}  .simapp
+      command: mv {{ node_home }}{{ item }}  {{ node_home }}
       loop: "{{ range(1, validators_count) | list }}"
       when: "inventory_hostname == groups['validators'][item]"
 
@@ -672,6 +687,10 @@
         flat: yes
       run_once: true
 
+    - name: remove tar files
+      become: true
+      command: rm -rf {{ node_home }}.tar.gz  
+
 - name: Copy the binaries to the other  full nodes
   hosts: fullnodes
   vars: 
@@ -685,24 +704,24 @@
 
     - name: Send the binaries to respective  fullnode server
       copy:
-        src: "{{ playbook_dir }}/simappf{{ item }}.tar.gz"
-        dest: "{{ user_home }}/simapp.tar.gz"
+        src: "{{ playbook_dir }}/{{ node_home }}f{{ item }}.tar.gz"
+        dest: "{{ user_home }}/{{ node_home }}.tar.gz"
       loop: "{{ range(0, fullnode_count) | list }}"
       when: "inventory_hostname == groups['fullnodes'][item]"   
 
     
-    - name: Unarchive the simapp.gz file
+    - name: Unarchive the binary.gz file
       become: true
       unarchive:
-        src: "{{ user_home }}/simapp.tar.gz"
+        src: "{{ user_home }}/{{ node_home }}.tar.gz"
         dest: "{{ user_home }}" 
         remote_src: yes 
       loop: "{{ range(0, fullnode_count) | list }}"
       when: "inventory_hostname == groups['fullnodes'][item]"  
 
-    - name: Move simapps to .simapp
+    - name: Move binaries
       become: true
-      command: mv .simappf{{ item }}  .simapp
+      command: mv {{ node_home }}f{{ item }}  {{ node_home }}
       loop: "{{ range(0, fullnode_count) | list }}"
       when: "inventory_hostname == groups['fullnodes'][item]"
 
@@ -761,6 +780,12 @@
       shell: systemctl restart systemd-journald.service 
       loop: "{{ range(0, fullnode_count) | list }}"
       when: "inventory_hostname == groups['fullnodes'][item]" 
+
+    - name: remove tar files
+      become: true
+      command: rm -rf {{ node_home }}.tar.gz
+        
+
 
 - name: Load Balancer Setup
   hosts: validators
@@ -1124,15 +1149,15 @@
   hosts: localhost
   tasks:      
 
-    - name: Remove simapp.tar.gz files of each full node
+    - name: Remove binary.tar.gz files of each full node
       file:
-        path: "{{ playbook_dir }}/simappf{{ item }}.tar.gz"
+        path: "{{ playbook_dir }}/{{ node_home }}f{{ item }}.tar.gz"
         state: absent
       loop: "{{ range(0, fullnode_count) | list }}"
 
-    - name: Remove simapp.tar.gz files of each validator 
+    - name: Remove binary.tar.gz files of each validator 
       file:
-        path: "{{ playbook_dir }}/simapp{{ item }}.tar.gz"
+        path: "{{ playbook_dir }}/{{ node_home }}{{ item }}.tar.gz"
         state: absent
       loop: "{{ range(1, validators_count) | list }}"  
 
