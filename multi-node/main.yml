@@ -72,7 +72,7 @@
 
     - name: Append IP addresses to .inventory file under [fullnodes]
       lineinfile:
-        path: "inventory2.ini"
+        path: "inventory.ini"
         insertafter: "^\\[fullnodes\\]"
         line: "fullnode{{ item.1 }} ansible_host={{ item.0 }} ansible_user={{ user }}"
       loop: "{{ reversed_ip_addresses }}"
@@ -122,7 +122,7 @@
 
     - name: Append IP addresses to .inventory file under [validators]
       lineinfile:
-        path: "inventory2.ini"
+        path: "inventory.ini"
         insertafter: "^\\[validators\\]"
         line: "validator{{ item.1 }} ansible_host={{ item.0 }} ansible_user={{ user }}"
       loop: "{{ reversed_ip_addresses1 }}"
@@ -821,7 +821,7 @@
 
     - name: Append RPC load balancer IP address under [loadbalancer] in the inventory file
       lineinfile:
-        path: "inventory2.ini"
+        path: "inventory.ini"
         insertafter: "^\\[loadbalancer\\]"
         line: "lb1 ansible_host={{ lb1 }}"
       run_once: true
@@ -873,7 +873,7 @@
 
     - name: Append API load balancer IP address under [loadbalancer] in the inventory file
       lineinfile:
-        path: "inventory2.ini"
+        path: "inventory.ini"
         insertafter: "^\\[loadbalancer\\]"
         line: "lb2 ansible_host={{ lb2 }}"
       run_once: true  
