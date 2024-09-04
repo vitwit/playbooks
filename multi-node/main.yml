@@ -1,9 +1,6 @@
 ---
 - name: Create fullnode Droplets
   hosts: localhost
-  
-  vars:
- 
   tasks:
     - name: Get DigitalOcean SSH Key ID
       uri:
@@ -62,6 +59,7 @@
     
     - name: Extract IP addresses
       set_fact:
+        droplet_ids: "{{ do1.results | json_query('[].data.droplet.id') | flatten }}"
         ip_addresses: "{{ do1.results | json_query('[].data.droplet.networks.v4[0].ip_address') | flatten }}"
 
    
@@ -107,7 +105,7 @@
 
     - name: Extract IP addresses
       set_fact:
-        droplet_ids: "{{ do2.results | json_query('[].data.droplet.id') | flatten }}"
+        
         ip_addresses1: "{{ do2.results | json_query('[].data.droplet.networks.v4[0].ip_address') | flatten }}"
 
     - name: Reverse IP addresses list
@@ -479,7 +477,6 @@
       become: true
       command: "chown -R {{ ansible_user }}:{{ ansible_user }} {{ user_home }}/{{ node_home }}/cosmovisor"
 
-################################################################################################################################      
 
     - name: Compress other validators binary directories
       become: true
@@ -613,42 +610,6 @@
         line: 'persistent_peers = "{{ hostvars["validator0"]["node_ids_dict"][0] }}@{{ validator0_ip }}:26656,{{ hostvars["validator1"]["node_ids_dict"][1] }}@{{ validator1_ip }}:26656"'
       loop: "{{ range(0, validators_count) | list }}"
  
-    - name: Make rpc publicly accessible
-      become: true
-      lineinfile:
-        path: "{{ node_home }}/config/config.toml"
-        regexp: 'laddr = "tcp://127.0.0.1:26657"'
-        line: 'laddr = "tcp://0.0.0.0:26657"'  
-
-    - name: replace localhost under api section
-      become: true
-      replace:
-        path: "{{ node_home }}/config/app.toml"
-        regexp: 'address = "tcp://localhost:1317"'
-        replace: 'address = "tcp://0.0.0.0:1317"'  
-
-    - name: Making the change in the CORS section of config.toml
-      become: true
-      lineinfile:
-        path: "{{ node_home }}/config/config.toml"
-        regexp: 'cors_allowed_origins = \[\]'
-        line: 'cors_allowed_origins = ["*"]'
-
-    - name: Making the change in the CORS section of app.toml
-      become: true
-      lineinfile:
-        path: "{{ node_home }}/config/app.toml"
-        regexp: "enabled-unsafe-cors = false"
-        line: "enabled-unsafe-cors = true"
-
-    - name: set enable to true under api section
-      become: true
-      replace:
-        path: "{{ node_home }}/config/app.toml"
-        regexp: '(?ms)(\[api\][^\[]*enable\s*=\s*)false'
-        replace: '\1true'     
-
-   
     - name: Copy the service file
       become: true
       template:
@@ -694,13 +655,12 @@
 - name: Copy the binaries to the other  full nodes
   hosts: fullnodes
   vars: 
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
     validator0_ip: "{{ hostvars['validator0']['ansible_host'] }}"
     validator1_ip: "{{ hostvars['validator1']['ansible_host'] }}"
   tasks:
 
-    - name: Disable host key checking
-      set_fact:
-        ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+    
 
     - name: Send the binaries to respective  fullnode server
       copy:
@@ -731,6 +691,41 @@
         src: "{{ playbook_dir }}/genesis.json"
         dest: "{{ user_home }}/{{ node_home }}/config/genesis.json" 
       loop: "{{ range(0, fullnode_count) | list }}"
+
+    - name: Make rpc publicly accessible
+      become: true
+      lineinfile:
+        path: "{{ node_home }}/config/config.toml"
+        regexp: 'laddr = "tcp://127.0.0.1:26657"'
+        line: 'laddr = "tcp://0.0.0.0:26657"'  
+
+    - name: replace localhost under api section
+      become: true
+      replace:
+        path: "{{ node_home }}/config/app.toml"
+        regexp: 'address = "tcp://localhost:1317"'
+        replace: 'address = "tcp://0.0.0.0:1317"'  
+
+    - name: Making the change in the CORS section of config.toml
+      become: true
+      lineinfile:
+        path: "{{ node_home }}/config/config.toml"
+        regexp: 'cors_allowed_origins = \[\]'
+        line: 'cors_allowed_origins = ["*"]'
+
+    - name: Making the change in the CORS section of app.toml
+      become: true
+      lineinfile:
+        path: "{{ node_home }}/config/app.toml"
+        regexp: "enabled-unsafe-cors = false"
+        line: "enabled-unsafe-cors = true"
+
+    - name: set enable to true under api section
+      become: true
+      replace:
+        path: "{{ node_home }}/config/app.toml"
+        regexp: '(?ms)(\[api\][^\[]*enable\s*=\s*)false'
+        replace: '\1true'       
 
     - name: Setup cosmovisor for fullnodes
       become: true
@@ -788,7 +783,7 @@
 
 
 - name: Load Balancer Setup
-  hosts: validators
+  hosts: fullnodes
   tasks:    
     - name: Debug droplet IDs
       debug:
@@ -904,8 +899,6 @@
       run_once: true  
       delegate_to: localhost
    
-
-
     - name: Install nvm
       shell: >
         curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.4/install.sh | bash &&
@@ -995,9 +988,6 @@
       args:
         chdir: "{{ user_home }}/explorer"
 
-- name: Faucet related tasks
-  hosts: validators
-  tasks:
     - name: Install the faucet
       become: true
       shell: git clone https://github.com/vitwit/ping-faucet.git faucet && cd faucet && git checkout multi-chains
@@ -1069,8 +1059,8 @@
       environment:
         PATH: "{{ path }}"
         HOME: "{{ user_home }}"
-      loop: "{{ range(0, validators_count) | list }}"
-      when: "inventory_hostname == groups['validators'][item]"    
+      loop: "{{ range(0, fullnode_count) | list }}"
+      when: "inventory_hostname == groups['fullnodes'][item]"    
       become_user: "{{ ansible_user }}"
       become_method: sudo
 
@@ -1095,8 +1085,8 @@
       environment:
         PATH: "{{ path }}"
         HOME: "{{ user_home }}"
-      loop: "{{ range(0, validators_count) | list }}"
-      when: inventory_hostname == groups['validators'][item]
+      loop: "{{ range(0, fullnode_count) | list }}"
+      when: inventory_hostname == groups['fullnodes'][item]
 
     - name: Debug the faucet_addr_results
       debug:
@@ -1105,18 +1095,18 @@
     - name: Store faucet addresses in a dictionary
       set_fact:
         faucet_addresses: "{{ faucet_addresses | default({}) | combine({item: (faucet_addr_results.results[item].stdout if 'stdout' in faucet_addr_results.results[item] else 'skipped') }) }}"
-      loop: "{{ range(0, validators_count) | list }}"
+      loop: "{{ range(0, fullnode_count) | list }}"
 
     - name: Debug the faucet addresses
       debug:
         var: faucet_addresses  
     
     - name: Transfer funds from genesis account to the faucet account
-      shell: "{{ daemon }} tx bank send {{ validator_key }} {{ faucet_addr_results.results[item].stdout }} 10000000000{{ denom }} --keyring-backend test --chain-id {{ chain_id }} -y"
+      shell: "{{ daemon }} tx bank send {{ fullnode_key }}{{ item }} {{ faucet_addr_results.results[item].stdout }} 10000000000{{ denom }} --keyring-backend test --chain-id {{ chain_id }} -y"
       environment:
         PATH: "{{ path }}"
-      loop: "{{ range(0, validators_count) | list }}"
-      when: inventory_hostname == groups['validators'][item]
+      loop: "{{ range(0, fullnode_count) | list }}"
+      when: inventory_hostname == groups['fullnodes'][item]
 
     - name: Create load balancer for the explorer and faucet
       community.digitalocean.digital_ocean_load_balancer:
@@ -1143,7 +1133,7 @@
           response_timeout_seconds: 5
           healthy_threshold: 5
           unhealthy_threshold: 3
-      when: inventory_hostname == "validator0" 
+      when: inventory_hostname == "fullnode0" 
 
 - name: Remove the files from playbook_dir
   hosts: localhost
@@ -1169,7 +1159,11 @@
     - name: Remove the persistant peers.txt from the playbook_dir
       file: 
         path: "{{ playbook_dir }}/persistent_peers.txt"
-        state: absent     
+        state: absent 
+
+
+
+    
    
 
 
