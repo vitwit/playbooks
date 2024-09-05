@@ -21,8 +21,6 @@
       vars:
         query: "ssh_keys[?name=='{{ ssh_key_name }}'].id"
 
-   
-
     - name: Read file contents
       slurp:
         src: "{{ ssh_file_path }}"
@@ -54,15 +52,11 @@
         api_token: "{{ digital_ocean_api_token }}"
       with_sequence: start=0 end={{ fullnode_count-1 }}
       register: do1
-
-  
     
     - name: Extract IP addresses
       set_fact:
         droplet_ids: "{{ do1.results | json_query('[].data.droplet.id') | flatten }}"
         ip_addresses: "{{ do1.results | json_query('[].data.droplet.networks.v4[0].ip_address') | flatten }}"
-
-   
 
     - name: Reverse IP addresses list
       set_fact:
@@ -76,9 +70,6 @@
       loop: "{{ reversed_ip_addresses }}"
       loop_control:
         label: "{{ item[0] }}"
-
-
-
 
     - name: Create validator  node  Droplets
       digital_ocean_droplet:
@@ -104,8 +95,7 @@
       register: do2 
 
     - name: Extract IP addresses
-      set_fact:
-        
+      set_fact:        
         ip_addresses1: "{{ do2.results | json_query('[].data.droplet.networks.v4[0].ip_address') | flatten }}"
 
     - name: Reverse IP addresses list
@@ -114,9 +104,6 @@
     - name: Debug the user dir
       debug:
         msg: "User Directory: {{ reversed_ip_addresses1 }}"    
-
-    
-    
 
     - name: Append IP addresses to .inventory file under [validators]
       lineinfile:
@@ -133,8 +120,7 @@
 
     - name: sleep for a few seconds
       command: sleep 20    
-      
-
+  
     - name: Add new fullnodes to inventory
       add_host:
         name: "fullnode{{ item.1 }}"
@@ -155,17 +141,11 @@
       loop_control:
         label: "{{ item[0] }}"  
 
-   
-  
-
 - name: Installations
   hosts: validators:fullnodes
   vars:
     ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
   tasks:
-
- 
-
     - name: sleep for a few seconds
       command: sleep 20 
 
@@ -220,7 +200,6 @@
           - gcc
         state: present
 
-
     - name: Debug the  dir
       debug:
         msg: "User Directory: {{ user_home }}"
@@ -247,22 +226,17 @@
 - name: Setup Validator Nodes 
   hosts: validator0
   tasks:
-
-    
-
     - name: Initialize chain of each server
       command: "{{ daemon }} init {{ validator_name }}{{ item }} --chain-id {{ chain_id }} --home {{ user_home }}/{{ node_home }}{{ item }}"
       environment:
         PATH: "{{ path }}"
       loop: "{{ range(1, validators_count) | list }}"
 
-
     - name: Initialize chain on each server
       command: "{{ daemon }} init {{ fullnode_name }}{{ item }} --chain-id {{ chain_id }} --home {{ user_home }}/{{ node_home }}f{{ item }}"
       environment:
         PATH: "{{ path }}"
       loop: "{{ range(0, fullnode_count) | list }}"
-
 
     - name: Change denom to the required denom
       become: true
@@ -288,7 +262,6 @@
         line: '"voting_period": "{{ voting_period }}",'
       loop: "{{ range(0, fullnode_count) | list }}"  
 
-
     - name: Replace expediated voting_period value for validators
       lineinfile:
         path: "{{ user_home }}/{{ node_home }}{{ item }}/config/genesis.json"
@@ -309,20 +282,17 @@
         jq '.app_state.gov.params.min_deposit[0].amount = "{{ min_deposit_value }}"' {{ user_home }}/{{ node_home }}{{ item }}/config/genesis.json > temp.json && mv temp.json {{ user_home }}/{{ node_home }}{{ item }}/config/genesis.json
       loop: "{{ range(1, validators_count) | list }}"
 
-
     - name: Update "amount" value in the JSON file for fullnodes
       become: true
       shell: |
         jq '.app_state.gov.params.min_deposit[0].amount = "{{ min_deposit_value }}"' {{ user_home }}/{{ node_home }}f{{ item }}/config/genesis.json > temp1.json && mv temp1.json {{ user_home }}/{{ node_home }}f{{ item }}/config/genesis.json
       loop: "{{ range(0, fullnode_count) | list }}"  
-
   
     - name: Add Keys for Validators
       command: "{{ daemon }} keys add {{ validator_key }} --keyring-backend test --home {{ user_home }}/{{ node_home }}{{ item }}"
       environment:
         PATH: "{{ path }}"
       loop: "{{ range(1, validators_count) | list }}"  
-
 
     - name: Add Keys for fullnodes
       command: "{{ daemon }} keys add {{ fullnode_key }}{{ item }} --keyring-backend test --home {{ user_home }}/{{ node_home }}f{{ item }}"
@@ -337,7 +307,6 @@
         PATH: "{{ path }}"
       loop: "{{ range(1, validators_count) | list }}"  
 
-
     - name: Add genesis account for fullnodes
       become: true
       command: "{{ daemon }} genesis add-genesis-account {{ fullnode_key }}{{ item }}  100000000000{{ denom }} --keyring-backend test --home {{ user_home }}/{{ node_home }}f{{ item }}"
@@ -350,7 +319,6 @@
       environment:
         PATH: "{{ path }}"
       loop: "{{ range(1, validators_count) | list }}"  
-
 
     - name: Update minimum gas price for validators
       lineinfile:
@@ -377,7 +345,6 @@
         PATH: "{{ path }}"
         HOME: "{{ user_home }}"
       loop: "{{ range(1, validators_count) | list }}"
-
 
     - name: Retrieve the full node address
       become: true
@@ -426,7 +393,6 @@
         HOME: "{{ user_home }}"
       loop: "{{ validator_addresses_dict | dict2items }}"
 
-
     - name: Add all other full node genesis accounts on main validator
       become: true
       command: "{{ daemon }} genesis add-genesis-account {{ item.value }} 100000000000{{ denom }} --keyring-backend test --home {{ user_home }}/{{ node_home }}"
@@ -458,7 +424,6 @@
       environment:
         PATH: "{{ path }}"  
 
-
     - name: Fetch genesis.json from
       become: true
       fetch:
@@ -476,7 +441,6 @@
     - name: Change ownership of cosmovisor directory
       become: true
       command: "chown -R {{ ansible_user }}:{{ ansible_user }} {{ user_home }}/{{ node_home }}/cosmovisor"
-
 
     - name: Compress other validators binary directories
       become: true
@@ -528,18 +492,14 @@
   vars: 
     validator0_ip: "{{ hostvars['validator0']['ansible_host'] }}"
     validator1_ip: "{{ hostvars['validator1']['ansible_host'] }}"
-    ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
-  
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no"  
   tasks:
-    
-
     - name: Send the binaries to respective  validators server
       copy:
         src: "{{ playbook_dir }}/{{ node_home }}{{ item }}.tar.gz"
         dest: "{{ user_home }}/{{ node_home }}.tar.gz"
       loop: "{{ range(1, validators_count) | list }}"
       when: "inventory_hostname == groups['validators'][item]"   
-
     
     - name: Unarchive the binary file
       become: true
@@ -555,7 +515,6 @@
       command: mv {{ node_home }}{{ item }}  {{ node_home }}
       loop: "{{ range(1, validators_count) | list }}"
       when: "inventory_hostname == groups['validators'][item]"
-
 
     - name: Replace the existing genesis.json
       become: true
@@ -577,7 +536,6 @@
       command: "chown -R {{ ansible_user }}:{{ ansible_user }} {{ user_home }}/{{ node_home }}/cosmovisor"
       loop: "{{ range(1, validators_count) | list }}"
 
-
     - name: Extract node-id for all  validators
       become: true
       shell: "{{ daemon }} tendermint show-node-id"
@@ -592,9 +550,6 @@
         node_ids_dict: "{{ node_ids_dict | default({}) | combine({item.item : item.stdout}) }}"
       loop: "{{ node_ids.results }}"
     
-     
-
-
     - name: Debug node id 0
       debug: 
         var: node_ids_dict[0]
@@ -659,16 +614,12 @@
     validator0_ip: "{{ hostvars['validator0']['ansible_host'] }}"
     validator1_ip: "{{ hostvars['validator1']['ansible_host'] }}"
   tasks:
-
-    
-
     - name: Send the binaries to respective  fullnode server
       copy:
         src: "{{ playbook_dir }}/{{ node_home }}f{{ item }}.tar.gz"
         dest: "{{ user_home }}/{{ node_home }}.tar.gz"
       loop: "{{ range(0, fullnode_count) | list }}"
       when: "inventory_hostname == groups['fullnodes'][item]"   
-
     
     - name: Unarchive the binary.gz file
       become: true
@@ -748,7 +699,6 @@
         regexp: '^persistent_peers\s*=.*'
         replace: "{{ lookup('file', '{{ playbook_dir }}/persistent_peers.txt') }}"
 
-
     - name: Copy the service file
       become: true
       template:
@@ -759,7 +709,6 @@
         mode: "0644"
       loop: "{{ range(0, fullnode_count) | list }}"
       when: "inventory_hostname == groups['fullnodes'][item]"  
-
    
     - name: Start the service file
       become: true
@@ -780,8 +729,6 @@
       become: true
       command: rm -rf {{ node_home }}.tar.gz
         
-
-
 - name: Load Balancer Setup
   hosts: fullnodes
   tasks:    
@@ -816,7 +763,6 @@
       wait_for:
         timeout: 30
       run_once: true  
-
   
     - name: Get load balancer information by ID
       community.digitalocean.digital_ocean_load_balancer_info:
@@ -827,12 +773,9 @@
     - name: Debug the contents of rpc_lb_info
       debug:
         var: rpc_lb_info  
-
-
     - name: Show Load Balancer IP address
       debug:
         msg: "Load Balancer IP: {{ rpc_lb_info.data[0].ip if rpc_lb_info.data[0].ip is defined else 'IP not available yet' }}"
-
 
     - name: Set lb1 variable to the RPC load balancer IP address
       set_fact:
@@ -847,8 +790,6 @@
       run_once: true
       delegate_to: localhost
   
-
-    
     - name: Create load balancer for API endpoint
       community.digitalocean.digital_ocean_load_balancer:
         api_token: "{{ digital_ocean_api_token }}"
@@ -1138,7 +1079,6 @@
 - name: Remove the files from playbook_dir
   hosts: localhost
   tasks:      
-
     - name: Remove binary.tar.gz files of each full node
       file:
         path: "{{ playbook_dir }}/{{ node_home }}f{{ item }}.tar.gz"
