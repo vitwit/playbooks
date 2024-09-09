@@ -1,0 +1,22 @@
+---
+- name: Remove binary.tar.gz files of each full node
+  file:
+    path: "{{ playbook_dir }}/{{ node_home }}f{{ item }}.tar.gz"
+    state: absent
+  loop: "{{ range(0, fullnode_count) | list }}"
+
+- name: Remove binary.tar.gz files of each validator
+  file:
+    path: "{{ playbook_dir }}/{{ node_home }}{{ item }}.tar.gz"
+    state: absent
+  loop: "{{ range(1, validators_count) | list }}"
+
+- name: Remove the genesis.json from the playbook_dir
+  file:
+    path: "{{ playbook_dir }}/genesis.json"
+    state: absent
+
+- name: Remove the persistant peers.txt from the playbook_dir
+  file:
+    path: "{{ playbook_dir }}/persistent_peers.txt"
+    state: absent

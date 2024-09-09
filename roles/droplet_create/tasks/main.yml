@@ -1,0 +1,125 @@
+---
+- name: Get DigitalOcean SSH Key ID
+  uri:
+    url: "https://api.digitalocean.com/v2/account/keys"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ digital_ocean_api_token }}"
+    return_content: yes
+  register: ssh_key_response
+- name: Debug SSH Key Response
+  debug:
+    var: ssh_key_response
+- name: Parse SSH Key ID
+  set_fact:
+    ssh_key_id: "{{ (ssh_key_response.json | json_query(query)) | first }}"
+  vars:
+    query: "ssh_keys[?name=='{{ ssh_key_name }}'].id"
+- name: Read file contents
+  slurp:
+    src: "{{ ssh_file_path }}"
+  register: ssh_content
+- name: Store SSH key contents into a variable
+  set_fact:
+    ssh_key_variable: "{{ ssh_content['content'] | b64decode }}"
+- name: Create full node  Droplet
+  digital_ocean_droplet:
+    state: present
+    name: "fullnode{{ item }}"
+    size: s-2vcpu-4gb
+    image: ubuntu-22-04-x64
+    region: "{{ region }}"
+    ssh_keys: "{{ ssh_key_id }}"
+    monitoring: false
+    ipv6: false
+    user_data: |
+      #cloud-config
+      users:
+        - name: {{ user }}
+          groups: sudo
+          sudo: "ALL=(ALL) NOPASSWD:ALL"
+          shell: /bin/bash
+          ssh-authorized-keys:
+            - {{ ssh_key_variable  }}
+    api_token: "{{ digital_ocean_api_token }}"
+  with_sequence: start=0 end={{ fullnode_count-1 }}
+  register: do1
+
+- name: Extract IP addresses
+  set_fact:
+    droplet_ids: "{{ do1.results | json_query('[].data.droplet.id') | flatten }}"
+    ip_addresses: "{{ do1.results | json_query('[].data.droplet.networks.v4[0].ip_address') | flatten }}"
+- name: Reverse IP addresses list
+  set_fact:
+    reversed_ip_addresses: "{{ ip_addresses | zip(range(fullnode_count)) | list | reverse }}"
+- name: Append IP addresses to .inventory file under [fullnodes]
+  lineinfile:
+    path: "inventory.ini"
+    insertafter: "^\\[fullnodes\\]"
+    line: "fullnode{{ item.1 }} ansible_host={{ item.0 }} ansible_user={{ user }}"
+  loop: "{{ reversed_ip_addresses }}"
+  loop_control:
+    label: "{{ item[0] }}"
+- name: Create validator  node  Droplets
+  digital_ocean_droplet:
+    state: present
+    name: "validator{{ item }}"
+    size: s-2vcpu-4gb
+    image: ubuntu-22-04-x64
+    region: "{{ region }}"
+    ssh_keys: "{{ ssh_key_id }}"
+    monitoring: false
+    ipv6: false
+    user_data: |
+      #cloud-config
+      users:
+        - name: {{ user }}
+          groups: sudo
+          sudo: "ALL=(ALL) NOPASSWD:ALL"
+          shell: /bin/bash
+          ssh-authorized-keys:
+            - {{ ssh_key_variable  }}
+    api_token: "{{ digital_ocean_api_token }}"
+  with_sequence: start=0 end={{ validators_count-1 }}
+  register: do2
+- name: Extract IP addresses
+  set_fact:
+    ip_addresses1: "{{ do2.results | json_query('[].data.droplet.networks.v4[0].ip_address') | flatten }}"
+- name: Reverse IP addresses list
+  set_fact:
+    reversed_ip_addresses1: "{{ ip_addresses1| zip(range(validators_count)) | list | reverse }}"
+- name: Debug the user dir
+  debug:
+    msg: "User Directory: {{ reversed_ip_addresses1 }}"
+- name: Append IP addresses to .inventory file under [validators]
+  lineinfile:
+    path: "inventory.ini"
+    insertafter: "^\\[validators\\]"
+    line: "validator{{ item.1 }} ansible_host={{ item.0 }} ansible_user={{ user }}"
+  loop: "{{ reversed_ip_addresses1 }}"
+  loop_control:
+    label: "{{ item[0] }}"
+- name: Disable host key checking
+  set_fact:
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+- name: sleep for a few seconds
+  command: sleep 20
+
+- name: Add new fullnodes to inventory
+  add_host:
+    name: "fullnode{{ item.1 }}"
+    ansible_host: "{{ item.0 }}"
+    ansible_user: "{{ user }}"
+    groups: fullnodes
+  loop: "{{ ip_addresses | zip(range(fullnode_count)) | list }}"
+  loop_control:
+    label: "{{ item[0] }}"
+- name: Add new validators to inventory
+  add_host:
+    name: "validator{{ item.1 }}"
+    ansible_host: "{{ item.0 }}"
+    ansible_user: "{{ user }}"
+    groups: validators
+  loop: "{{ ip_addresses1 | zip(range(validators_count)) | list }}"
+  loop_control:
+    label: "{{ item[0] }}"
