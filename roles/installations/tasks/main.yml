@@ -1,32 +1,42 @@
 ---
 - name: sleep for a few seconds
-  command: sleep 20
+  pause:
+    seconds: 20
 
 - name: Debug the user dir
   debug:
     msg: "User Directory: {{ user_home }}"
 
 - name: Download go tar file
-  command: wget https://go.dev/dl/go{{go_version}}.linux-amd64.tar.gz
+  get_url:
+    url: https://go.dev/dl/go{{go_version}}.linux-amd64.tar.gz
+    dest: /tmp/go{{go_version}}.linux-amd64.tar.gz
   become: true
 
 - name: Delete previous installation
-  command: rm -rf /usr/local/go
+  file:
+    path: /usr/local/go
+    state: absent
   become: true
 
 - name: Extract and move new go folder to /usr/local
-  command: tar -C /usr/local -xzf go{{go_version}}.linux-amd64.tar.gz
+  unarchive:
+    src: /tmp/go{{go_version}}.linux-amd64.tar.gz
+    dest: /usr/local
+    remote_src: yes
   become: true
 
 - name: Delete downloaded tar file
-  shell: rm -rf go{{go_version}}.linux-amd64.tar.gz*
+  file:
+    path: /tmp/go{{go_version}}.linux-amd64.tar.gz
+    state: absent
   become: true
 
 - name: Set Go environment variables in ~/.profile
   lineinfile:
     path: ~/.profile
     line: |
-      export GOROOT=/usr/local/go 
+      export GOROOT=/usr/local/go
       export GOPATH={{ user_home }}/go
       export GOBIN=$GOPATH/bin
       export PATH=$PATH:/usr/local/go/bin:$GOBIN
@@ -34,7 +44,8 @@
     state: present
 
 - name: sleep for a few seconds
-  command: sleep 15
+  pause:
+    seconds: 20
 
 - name: Update apt package list
   become: true
@@ -42,7 +53,8 @@
     update_cache: yes
 
 - name: sleep for a few seconds
-  command: sleep 30
+  pause:
+    seconds: 20
 
 - name: Install prerequisites
   become: true

@@ -12,9 +12,6 @@ if (!fs.existsSync(mnemonic_path)) {
 }
 
 const mnemonic = fs.readFileSync(mnemonic_path, 'utf8')
-console.log("======================== faucet mnemonic =========================")
-console.log(mnemonic)
-console.log("==================================================================")
 
 export default {
     port: 83, // http port 

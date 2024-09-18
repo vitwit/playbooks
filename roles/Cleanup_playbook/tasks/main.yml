@@ -16,7 +16,7 @@
     path: "{{ playbook_dir }}/genesis.json"
     state: absent
 
-- name: Remove the persistant peers.txt from the playbook_dir
+- name: Remove the persistent peers.txt from the playbook_dir
   file:
     path: "{{ playbook_dir }}/persistent_peers.txt"
     state: absent

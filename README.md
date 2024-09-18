@@ -3,7 +3,6 @@
 
 1. Clone the github repository.
 
-
 2. In the inventory file make all the required changes to the following fields
 ```
 ansible_ssh_private_key_file="Specify path to the private_key  ex:~/.ssh/id_rsa"
@@ -11,7 +10,7 @@ ssh_file_path="Specify the path to the pub key ex: /home/user/.ssh/id_rsa.pub"
 digital_ocean_api_token="Specify the digital ocean token"
 ssh_key_name="Specify the name assigned to your ssh key on digital ocean"
 ```
-You can also make changes to the user and denom field shown below
+Additionally, you can modify the fields shown below:"
 ```
 denom=atom
 minimum_gas_price=0atom
@@ -24,7 +23,7 @@ region=blr1
 validator_name=val
 fullnode_name=ful
 ```
-3. In the faucet-config.j2 file present in the templates change the denom to the one specified in the inventory
+3. In the faucet-config.j2 file present in the templates, change the denom to the one specified in the inventory.
 ```
 {
                 amount: [
@@ -48,6 +47,6 @@ fullnode_name=ful
 ansible-playbook main.yml  -i inventory.ini
 ```
 
-5. To view the explorer enter the explorer-load balancer ip. For the faucet enter explorer-load balancer ip:83
-### NOTE: Inorder to run the playbook more than once make sure to remove the fields in the inventory generated under: 
+5. To view the explorer, enter the explorer-load balancer IP. For the faucet, enter explorer-load balancer IP:83.
+## NOTE: In order to run the playbook more than once, make sure to remove the fields in the inventory generated under: 
 ### [validators] ,[fullnodes], [loadbalancer]

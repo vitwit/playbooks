@@ -44,7 +44,7 @@
   git:
     repo: "{{ ping_repo }}"
     dest: "{{ user_home }}/explorer"
-    version: "f35fb4485630a6d80a9246f29e753e9e75fefbd3"
+    version: "f0120a4a9f1a96f596139f36a9030fd05f227d8b"
 
 - name: Install nginx
   become: true
