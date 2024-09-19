@@ -1,7 +1,7 @@
 # Multi-Node Network Setup
 
 ## Overview
-This ansible playbook automates the setup of a multinode network, consisting of both fullnodes and validator nodes. Additionally it also  sets up an explorer and a faucet for the blockchain network. It also configures load balancers to expose RPC and API endpoints of fullnodes. It also configures a load balancer for explorer and faucet of the network. This playbook is primarily intended for testing purpose.
+This ansible playbook automates the setup of a multinode network, consisting of both fullnodes and validator nodes. Additionally, it also  sets up an explorer and a faucet for the blockchain network. It also configures load balancers to expose RPC and API endpoints of fullnodes. It also configures a load balancer for explorer and faucet of the network. This playbook is primarily intended for testing purpose.
 
 ## Components
 1. Full nodes
@@ -9,12 +9,12 @@ This ansible playbook automates the setup of a multinode network, consisting of 
 3. Explorer
 4. Faucet
 
-## Pre-requisites:
+## Pre-requisites
 1. Ansible
 2. DigitalOcean account and DigitalOcean API token
 
 ## How It Works
-## NOTE: This Ansible playbook is designed specifically for use with the DigitalOcean provider.
+## NOTE: This Ansible playbook is designed specifically for use with the DigitalOcean provider
 
 1. Droplet Creation
 
@@ -41,15 +41,15 @@ After the nodes are operational, an explorer and a faucet are set up for the mul
 
 1. Clone the github repository.
 
-2. In the inventory file make all the required changes to the following fields
-```
+2. In the inventory file, make all the required changes to the following fields
+```ini
 ansible_ssh_private_key_file="Specify path to the private_key  ex:~/.ssh/id_rsa"
 ssh_file_path="Specify the path to the pub key ex: /home/user/.ssh/id_rsa.pub"
 digital_ocean_api_token="Specify the digital ocean token"
 ssh_key_name="Specify the name assigned to your ssh key on digital ocean"
 ```
 Additionally, you can modify the fields shown below:"
-```
+```ini
 denom=atom
 minimum_gas_price=0atom
 user=root
@@ -62,7 +62,7 @@ validator_name=val
 fullnode_name=ful
 ```
 3. In the faucet-config.j2 file present in the templates, change the denom to the one specified in the inventory.
-```
+```json
 {
                 amount: [
                     {
@@ -81,10 +81,10 @@ fullnode_name=ful
 
 
 4. Run the playbook using the command :
-```
+```bash
 ansible-playbook main.yml  -i inventory.ini
 ```
 
 5. To view the explorer, enter the explorer-load balancer IP. For the faucet, enter explorer-load balancer IP:83.
-## NOTE: In order to run the playbook more than once, make sure to remove the fields in the inventory generated under: 
+## NOTE: To rerun the playbook, remove the fields in the inventory generated under: 
 ### [validators] ,[fullnodes], [loadbalancer]
