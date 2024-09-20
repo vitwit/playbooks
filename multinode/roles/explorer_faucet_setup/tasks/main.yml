@@ -17,7 +17,6 @@
     executable: /bin/bash
   environment:
     NVM_DIR: "{{ user_home }}/.nvm"
-  become: true
 
 - name: Install Node.js
   shell: >
