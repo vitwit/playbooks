@@ -96,9 +96,6 @@
     path: "/var/www/html/"
     state: directory
 
-- name: Debug PATH
-  ansible.builtin.debug:
-    var: ansible_env.PATH
 - name: Build the explorer
   become: true
   shell: >
