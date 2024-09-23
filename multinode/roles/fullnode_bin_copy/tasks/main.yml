@@ -112,4 +112,6 @@
 
 - name: remove tar files
   become: true
-  command: rm -rf {{ node_home }}.tar.gz
+  file:
+    path: "{{ user_home }}/{{ node_home }}.tar.gz"
+    state: absent

@@ -13,12 +13,18 @@
 
 - name: Change denom to the required denom
   become: true
-  shell: sed -i $SED_EXT 's/"stake"/"{{ denom }}"/' {{ user_home }}/{{ node_home }}{{ item }}/config/genesis.json
+  replace:
+    path: "{{ user_home }}/{{ node_home }}{{ item }}/config/genesis.json"
+    regexp: '"stake"'
+    replace: '"{{ denom }}"'
   loop: "{{ range(1, validators_count) | list }}"
 
 - name: Change denom to the required denom for full node
   become: true
-  shell: sed -i $SED_EXT 's/"stake"/"{{ denom }}"/' {{ user_home }}/{{ node_home }}f{{ item }}/config/genesis.json
+  replace:
+    path: "{{ user_home }}/{{ node_home }}f{{ item }}/config/genesis.json"
+    regexp: '"stake"'
+    replace: '"{{ denom }}"'
   loop: "{{ range(0, fullnode_count) | list }}"
 
 - name: Replace voting_period value for validators
@@ -98,7 +104,6 @@
     path: "{{ user_home }}/{{ node_home }}{{ item }}/config/app.toml"
     regexp: "^minimum-gas-prices ="
     line: 'minimum-gas-prices = "{{ minimum_gas_price }}"'
-    state: present
   loop: "{{ range(1, validators_count) | list }}"
 
 - name: Update minimum gas price for fullnodes
@@ -107,7 +112,6 @@
     path: "{{ user_home }}/{{ node_home }}f{{ item }}/config/app.toml"
     regexp: "^minimum-gas-prices ="
     line: 'minimum-gas-prices = "{{ minimum_gas_price }}"'
-    state: present
   loop: "{{ range(0, fullnode_count) | list }}"
 
 - name: Retrieve the validator address
@@ -197,10 +201,10 @@
   environment:
     PATH: "{{ path }}"
 
-- name: Fetch genesis.json from
+- name: Fetch genesis.json
   become: true
   fetch:
-    src: "{{ node_home }}/config/genesis.json"
+    src: "{{ user_home }}/{{ node_home }}/config/genesis.json"
     dest: "{{ playbook_dir }}/genesis.json"
     flat: yes
 
@@ -247,15 +251,28 @@
 
 - name: Remove the fullnode tar files
   become: true
-  command: rm -rf {{ node_home }}f{{ item }}.tar.gz
+  file:
+    path: "{{ node_home }}f{{ item }}.tar.gz"
+    state: absent
+  loop: "{{ range(0, fullnode_count) | list }}"
+
+- name: Remove the other fullnode files
+  become: true
+  file:
+    path: "{{ node_home }}f{{ item }}"
+    state: absent
   loop: "{{ range(0, fullnode_count) | list }}"
 
 - name: Remove the validator tar files
   become: true
-  command: rm -rf {{ node_home }}{{ item }}.tar.gz
+  file:
+    path: "{{ node_home }}{{ item }}.tar.gz"
+    state: absent
   loop: "{{ range(1, validators_count) | list }}"
 
-- name: Remove the  other validator  files
+- name: Remove the other validator files
   become: true
-  command: rm -rf {{ node_home }}{{ item }}
+  file:
+    path: "{{ node_home }}{{ item }}"
+    state: absent
   loop: "{{ range(1, validators_count) | list }}"

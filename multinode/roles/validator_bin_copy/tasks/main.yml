@@ -38,7 +38,11 @@
 
 - name: Change ownership of cosmovisor directory
   become: true
-  command: "chown -R {{ ansible_user }}:{{ ansible_user }} {{ user_home }}/{{ node_home }}/cosmovisor"
+  file:
+    path: "{{ user_home }}/{{ node_home }}/cosmovisor"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    recurse: yes
   loop: "{{ range(1, validators_count) | list }}"
 
 - name: Extract node-id for all  validators
@@ -110,4 +114,6 @@
 
 - name: remove tar files
   become: true
-  command: rm -rf {{ node_home }}.tar.gz
+  file:
+    path: "{{ user_home }}/{{ node_home }}.tar.gz"
+    state: absent
