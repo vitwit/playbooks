@@ -112,6 +112,13 @@
     flat: yes
   run_once: true
 
+- name: Remove persistent_peers.txt
+  become: true
+  file:
+    path: "{{ user_home }}/persistent_peers.txt"
+    state: absent
+  run_once: true  
+
 - name: remove tar files
   become: true
   file:

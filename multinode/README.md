@@ -86,5 +86,6 @@ ansible-playbook main.yml  -i inventory.ini
 ```
 
 5. To view the explorer, enter the explorer-load balancer IP. For the faucet, enter explorer-load balancer IP:83.
+Initially, refresh the faucet page (Ctrl + Shift + R) until the Faucet Address and balance fields are visible.
 ## NOTE: To rerun the playbook, remove the fields in the inventory generated under: 
 ### [validators] ,[fullnodes], [loadbalancer]
