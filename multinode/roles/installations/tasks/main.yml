@@ -1,0 +1,89 @@
+---
+- name: sleep for a few seconds
+  pause:
+    seconds: 20
+
+- name: Debug the user dir
+  debug:
+    msg: "User Directory: {{ user_home }}"
+
+- name: Download go tar file
+  get_url:
+    url: https://go.dev/dl/go{{go_version}}.linux-amd64.tar.gz
+    dest: /tmp/go{{go_version}}.linux-amd64.tar.gz
+  become: true
+
+- name: Delete previous installation
+  file:
+    path: /usr/local/go
+    state: absent
+  become: true
+
+- name: Extract and move new go folder to /usr/local
+  unarchive:
+    src: /tmp/go{{go_version}}.linux-amd64.tar.gz
+    dest: /usr/local
+    remote_src: yes
+  become: true
+
+- name: Delete downloaded tar file
+  file:
+    path: /tmp/go{{go_version}}.linux-amd64.tar.gz
+    state: absent
+  become: true
+
+- name: Set Go environment variables in ~/.profile
+  lineinfile:
+    path: ~/.profile
+    line: |
+      export GOROOT=/usr/local/go
+      export GOPATH={{ user_home }}/go
+      export GOBIN=$GOPATH/bin
+      export PATH=$PATH:/usr/local/go/bin:$GOBIN
+    create: true
+    state: present
+
+- name: sleep for a few seconds
+  pause:
+    seconds: 20
+
+- name: Update apt package list
+  become: true
+  apt:
+    update_cache: yes
+
+- name: sleep for a few seconds
+  pause:
+    seconds: 20
+
+- name: Install prerequisites
+  become: true
+  apt:
+    name:
+      - make
+      - jq
+      - gcc
+    state: present
+
+- name: Debug the  dir
+  debug:
+    msg: "User Directory: {{ user_home }}"
+
+- name: Install the binary
+  become: true
+  block:
+    - name: Clone the git repo
+      git:
+        repo: "{{ repo }}"
+        dest: "{{ user_home }}/{{ network }}"
+        version: "{{ node_version }}"
+        update: yes
+        force: yes
+
+    - name: Install node
+      command: "make install"
+      args:
+        chdir: "{{ user_home }}/{{ network }}"
+      environment:
+        PATH: "{{ path }}"
+        GOPATH: "{{ user_home }}/go"

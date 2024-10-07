@@ -1,0 +1,278 @@
+---
+- name: Initialize  validator chain of each server
+  command: "{{ daemon }} init {{ validator_name }}{{ item }} --chain-id {{ chain_id }} --home {{ user_home }}/{{ node_home }}{{ item }}"
+  environment:
+    PATH: "{{ path }}"
+  loop: "{{ range(1, validators_count) | list }}"
+
+- name: Initialize fullnode chain on each server
+  command: "{{ daemon }} init {{ fullnode_name }}{{ item }} --chain-id {{ chain_id }} --home {{ user_home }}/{{ node_home }}f{{ item }}"
+  environment:
+    PATH: "{{ path }}"
+  loop: "{{ range(0, fullnode_count) | list }}"
+
+- name: Change denom to the required denom
+  become: true
+  replace:
+    path: "{{ user_home }}/{{ node_home }}{{ item }}/config/genesis.json"
+    regexp: '"stake"'
+    replace: '"{{ denom }}"'
+  loop: "{{ range(1, validators_count) | list }}"
+
+- name: Change denom to the required denom for full node
+  become: true
+  replace:
+    path: "{{ user_home }}/{{ node_home }}f{{ item }}/config/genesis.json"
+    regexp: '"stake"'
+    replace: '"{{ denom }}"'
+  loop: "{{ range(0, fullnode_count) | list }}"
+
+- name: Replace voting_period value for validators
+  lineinfile:
+    path: "{{ user_home }}/{{ node_home }}{{ item }}/config/genesis.json"
+    regexp: '^(\s*)"voting_period":\s*".*?",'
+    line: '"voting_period": "{{ voting_period }}",'
+  loop: "{{ range(1, validators_count) | list }}"
+
+- name: Replace voting_period value for fullnodes
+  lineinfile:
+    path: "{{ user_home }}/{{ node_home }}f{{ item }}/config/genesis.json"
+    regexp: '^(\s*)"voting_period":\s*".*?",'
+    line: '"voting_period": "{{ voting_period }}",'
+  loop: "{{ range(0, fullnode_count) | list }}"
+
+- name: Replace expediated voting_period value for validators
+  lineinfile:
+    path: "{{ user_home }}/{{ node_home }}{{ item }}/config/genesis.json"
+    regexp: '^(\s*)"expedited_voting_period":\s*".*?",'
+    line: '"expedited_voting_period": "{{ expedited_voting_period }}",'
+  loop: "{{ range(1, validators_count) | list }}"
+
+- name: Replace expediated voting_period value for fullnodes
+  lineinfile:
+    path: "{{ user_home }}/{{ node_home }}f{{ item }}/config/genesis.json"
+    regexp: '^(\s*)"expedited_voting_period":\s*".*?",'
+    line: '"expedited_voting_period": "{{ expedited_voting_period }}",'
+  loop: "{{ range(0, fullnode_count) | list }}"
+
+- name: Update "amount" value in the JSON file for Validators
+  become: true
+  shell: |
+    jq '.app_state.gov.params.min_deposit[0].amount = "{{ min_deposit_value }}"' {{ user_home }}/{{ node_home }}{{ item }}/config/genesis.json > temp.json && mv temp.json {{ user_home }}/{{ node_home }}{{ item }}/config/genesis.json
+  loop: "{{ range(1, validators_count) | list }}"
+
+- name: Update "amount" value in the JSON file for fullnodes
+  become: true
+  shell: |
+    jq '.app_state.gov.params.min_deposit[0].amount = "{{ min_deposit_value }}"' {{ user_home }}/{{ node_home }}f{{ item }}/config/genesis.json > temp1.json && mv temp1.json {{ user_home }}/{{ node_home }}f{{ item }}/config/genesis.json
+  loop: "{{ range(0, fullnode_count) | list }}"
+
+- name: Add Keys for Validators
+  command: "{{ daemon }} keys add {{ validator_key }} --keyring-backend test --home {{ user_home }}/{{ node_home }}{{ item }}"
+  environment:
+    PATH: "{{ path }}"
+  loop: "{{ range(1, validators_count) | list }}"
+
+- name: Add Keys for fullnodes
+  command: "{{ daemon }} keys add {{ fullnode_key }}{{ item }} --keyring-backend test --home {{ user_home }}/{{ node_home }}f{{ item }}"
+  environment:
+    PATH: "{{ path }}"
+  loop: "{{ range(0, fullnode_count) | list }}"
+
+- name: Add genesis account  for validators
+  become: true
+  command: "{{ daemon }} genesis add-genesis-account {{ validator_key }}  100000000000{{ denom }} --keyring-backend test --home {{ user_home }}/{{ node_home }}{{ item }}"
+  environment:
+    PATH: "{{ path }}"
+  loop: "{{ range(1, validators_count) | list }}"
+
+- name: Add genesis account for fullnodes
+  become: true
+  command: "{{ daemon }} genesis add-genesis-account {{ fullnode_key }}{{ item }}  100000000000{{ denom }} --keyring-backend test --home {{ user_home }}/{{ node_home }}f{{ item }}"
+  environment:
+    PATH: "{{ path }}"
+  loop: "{{ range(0, fullnode_count) | list }}"
+
+- name: Gentx Command
+  command: "{{ daemon }} genesis  gentx {{ validator_key }} 90000000000{{ denom }} --chain-id {{ chain_id }} --keyring-backend test --home {{ user_home }}/{{ node_home }}{{ item }}"
+  environment:
+    PATH: "{{ path }}"
+  loop: "{{ range(1, validators_count) | list }}"
+
+- name: Update minimum gas price for validators
+  lineinfile:
+    path: "{{ user_home }}/{{ node_home }}{{ item }}/config/app.toml"
+    regexp: "^minimum-gas-prices ="
+    line: 'minimum-gas-prices = "{{ minimum_gas_price }}"'
+  loop: "{{ range(1, validators_count) | list }}"
+
+- name: Update minimum gas price for fullnodes
+  become: true
+  lineinfile:
+    path: "{{ user_home }}/{{ node_home }}f{{ item }}/config/app.toml"
+    regexp: "^minimum-gas-prices ="
+    line: 'minimum-gas-prices = "{{ minimum_gas_price }}"'
+  loop: "{{ range(0, fullnode_count) | list }}"
+
+- name: Retrieve the validator address
+  become: true
+  shell: "{{ daemon }} keys show -a {{ validator_key }} --keyring-backend test --home {{ user_home }}/{{ node_home }}{{ item }}"
+  register: validator_addresses
+  environment:
+    PATH: "{{ path }}"
+    HOME: "{{ user_home }}"
+  loop: "{{ range(1, validators_count) | list }}"
+
+- name: Retrieve the full node address
+  become: true
+  shell: "{{ daemon }} keys show -a {{ fullnode_key }}{{ item }} --keyring-backend test --home {{ user_home }}/{{ node_home }}f{{ item }}"
+  register: fullnode_addresses
+  environment:
+    PATH: "{{ path }}"
+    HOME: "{{ user_home }}"
+  loop: "{{ range(0, fullnode_count) | list }}"
+
+- name: Set fact for validator addresses
+  set_fact:
+    validator_addresses_dict: "{{ validator_addresses_dict | default({}) | combine({item.item: item.stdout}) }}"
+  loop: "{{ validator_addresses.results }}"
+
+- name: Set fact for fullnode addresses
+  set_fact:
+    fullnode_addresses_dict: "{{ fullnode_addresses_dict | default({}) | combine({item.item: item.stdout}) }}"
+  loop: "{{ fullnode_addresses.results }}"
+
+- name: Initialize base validator
+  command: "{{ daemon }} init {{ validator_name }} --chain-id {{ chain_id }} --home {{ user_home }}/{{ node_home }}"
+  environment:
+    PATH: "{{ path }}"
+
+- name: Change denom to the required denom
+  become: true
+  shell: sed -i $SED_EXT 's/"stake"/"{{ denom }}"/' {{ user_home }}/{{ node_home }}/config/genesis.json
+
+- name: Add Keys
+  command: "{{ daemon }} keys add {{ validator_key }} --keyring-backend test --home {{ user_home }}/{{ node_home }}"
+  environment:
+    PATH: "{{ path }}"
+
+- name: Add genesis account
+  become: true
+  command: "{{ daemon }} genesis add-genesis-account {{ validator_key }}  100000000000{{ denom }} --keyring-backend test --home {{ user_home }}/{{ node_home }}"
+  environment:
+    PATH: "{{ path }}"
+
+- name: Add all other genesis accounts on main validator
+  become: true
+  command: "{{ daemon }} genesis add-genesis-account {{ item.value }} 100000000000{{ denom }} --keyring-backend test --home {{ user_home }}/{{ node_home }}"
+  environment:
+    PATH: "{{ path }}"
+    HOME: "{{ user_home }}"
+  loop: "{{ validator_addresses_dict | dict2items }}"
+
+- name: Add all other full node genesis accounts on main validator
+  become: true
+  command: "{{ daemon }} genesis add-genesis-account {{ item.value }} 100000000000{{ denom }} --keyring-backend test --home {{ user_home }}/{{ node_home }}"
+  environment:
+    PATH: "{{ path }}"
+    HOME: "{{ user_home }}"
+  loop: "{{ fullnode_addresses_dict | dict2items }}"
+
+- name: Gentx Command
+  command: "{{ daemon }} genesis  gentx {{ validator_key }} 90000000000{{ denom }} --chain-id {{ chain_id }} --keyring-backend test --home {{ user_home }}/{{ node_home }}"
+  environment:
+    PATH: "{{ path }}"
+
+- name: Copy  other validator gentx file into the validator 1 gentx folder
+  become: true
+  shell: "sudo cp {{ user_home }}/{{ node_home }}{{ item }}/config/gentx/* {{ user_home }}/{{ node_home }}/config/gentx"
+  loop: "{{ range(1, validators_count) | list }}"
+
+- name: Update minimum gas price on main validator
+  lineinfile:
+    path: "{{ user_home }}/{{ node_home }}/config/app.toml"
+    regexp: "^minimum-gas-prices ="
+    line: 'minimum-gas-prices = "{{ minimum_gas_price }}"'
+    state: present
+
+- name: Collect gentxs
+  become: true
+  command: "{{ daemon }} genesis  collect-gentxs --home {{ user_home }}/{{ node_home }}"
+  environment:
+    PATH: "{{ path }}"
+
+- name: Fetch genesis.json
+  become: true
+  fetch:
+    src: "{{ user_home }}/{{ node_home }}/config/genesis.json"
+    dest: "{{ playbook_dir }}/genesis.json"
+    flat: yes
+
+- name: Setup cosmovisor for main validator
+  become: true
+  shell: "go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest &&  mkdir -p {{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin && mkdir -p {{ user_home }}/{{ node_home }}/cosmovisor/upgrades && cp $GOPATH/bin/{{ daemon }} {{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin/{{ daemon }}"
+  environment:
+    GOPATH: "{{ user_home }}/go"
+    PATH: "{{ path }}"
+
+- name: Change ownership of cosmovisor directory
+  become: true
+  command: "chown -R {{ ansible_user }}:{{ ansible_user }} {{ user_home }}/{{ node_home }}/cosmovisor"
+
+- name: Compress other validators binary directories
+  become: true
+  archive:
+    path: "{{ user_home }}/{{ node_home }}{{ item }}"
+    dest: "{{ user_home }}/{{ node_home }}{{ item }}.tar.gz"
+  loop: "{{ range(1, validators_count) | list }}"
+
+- name: Fetch binaries for validators
+  become: true
+  fetch:
+    src: "{{ user_home }}/{{ node_home }}{{ item }}.tar.gz"
+    dest: "{{ playbook_dir }}/{{ node_home }}{{ item }}.tar.gz"
+    flat: yes
+  loop: "{{ range(1, validators_count) | list }}"
+
+- name: Compress other fullnode binary directories
+  become: true
+  archive:
+    path: "{{ user_home }}/{{ node_home }}f{{ item }}"
+    dest: "{{ user_home }}/{{ node_home }}f{{ item }}.tar.gz"
+  loop: "{{ range(0, fullnode_count) | list }}"
+
+- name: Fetch binaries for fullnodes
+  become: true
+  fetch:
+    src: "{{ user_home }}/{{ node_home }}f{{ item }}.tar.gz"
+    dest: "{{ playbook_dir }}/{{ node_home }}f{{ item }}.tar.gz"
+    flat: yes
+  loop: "{{ range(0, fullnode_count) | list }}"
+
+- name: Remove the fullnode tar files
+  become: true
+  file:
+    path: "{{ node_home }}f{{ item }}.tar.gz"
+    state: absent
+  loop: "{{ range(0, fullnode_count) | list }}"
+
+- name: Remove the other fullnode files
+  become: true
+  file:
+    path: "{{ node_home }}f{{ item }}"
+    state: absent
+  loop: "{{ range(0, fullnode_count) | list }}"
+
+- name: Remove the validator tar files
+  become: true
+  file:
+    path: "{{ node_home }}{{ item }}.tar.gz"
+    state: absent
+  loop: "{{ range(1, validators_count) | list }}"
+
+- name: Remove the other validator files
+  become: true
+  file:
+    path: "{{ node_home }}{{ item }}"
+    state: absent
+  loop: "{{ range(1, validators_count) | list }}"
