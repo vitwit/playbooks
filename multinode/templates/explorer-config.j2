@@ -1,0 +1,20 @@
+{
+    "chain_name": "{{ chain_id }}",
+    "api": [
+        {"address": "http://{{ lb2_ip }}"}
+    ],
+    "rpc": [
+        {"address": "http://{{ lb1_ip }}"}
+    ],
+    "sdk_version": "0.50.3",
+    "coin_type": "118",
+    "min_tx_fee": "800",
+    "addr_prefix": "cosmos",
+    "logo": "/logos/cosmos.svg",
+    "assets": [{
+        "base": "uatom",
+        "symbol": "ATOM",
+        "exponent": "6", 
+        "logo": "/logos/cosmos.svg"
+    }]
+}

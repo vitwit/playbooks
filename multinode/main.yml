@@ -1,0 +1,50 @@
+---
+- name: Create Droplets
+  hosts: localhost
+  roles:
+    - droplet_create
+
+- name: Installations
+  hosts: validators:fullnodes
+  vars:
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+  roles:
+    - installations
+
+- name: Setup validator and fullnodes
+  hosts: validator0
+  roles:
+    - validator_Setup
+
+- name: Copy the validator binary files
+  hosts: validators
+  vars:
+    validator0_ip: "{{ hostvars['validator0']['ansible_host'] }}"
+    validator1_ip: "{{ hostvars['validator1']['ansible_host'] }}"
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+  roles:
+    - validator_bin_copy
+
+- name: Copy the fullnode binary files
+  hosts: fullnodes
+  vars:
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+    validator0_ip: "{{ hostvars['validator0']['ansible_host'] }}"
+    validator1_ip: "{{ hostvars['validator1']['ansible_host'] }}"
+  roles:
+    - fullnode_bin_copy
+
+- name: Setup the rpc and api loadbalancer
+  hosts: fullnodes
+  roles:
+    - rpc_api_loadbalancer
+
+- name: Setup explorer and faucet
+  hosts: fullnodes
+  roles:
+    - explorer_faucet_setup
+
+- name: Cleanup the playbook
+  hosts: localhost
+  roles:
+    - Cleanup_playbook

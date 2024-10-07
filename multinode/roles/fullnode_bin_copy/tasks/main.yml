@@ -1,0 +1,117 @@
+---
+- name: Send the binaries to respective  fullnode server
+  copy:
+    src: "{{ playbook_dir }}/{{ node_home }}f{{ item }}.tar.gz"
+    dest: "{{ user_home }}/{{ node_home }}.tar.gz"
+  loop: "{{ range(0, fullnode_count) | list }}"
+  when: "inventory_hostname == groups['fullnodes'][item]"
+
+- name: Unarchive the binary.gz file
+  become: true
+  unarchive:
+    src: "{{ user_home }}/{{ node_home }}.tar.gz"
+    dest: "{{ user_home }}"
+    remote_src: yes
+  loop: "{{ range(0, fullnode_count) | list }}"
+  when: "inventory_hostname == groups['fullnodes'][item]"
+
+- name: Move binaries
+  become: true
+  command: mv {{ node_home }}f{{ item }}  {{ node_home }}
+  loop: "{{ range(0, fullnode_count) | list }}"
+  when: "inventory_hostname == groups['fullnodes'][item]"
+
+- name: Replace the existing genesis.json
+  become: true
+  copy:
+    src: "{{ playbook_dir }}/genesis.json"
+    dest: "{{ user_home }}/{{ node_home }}/config/genesis.json"
+  loop: "{{ range(0, fullnode_count) | list }}"
+
+- name: Make rpc publicly accessible
+  become: true
+  lineinfile:
+    path: "{{ node_home }}/config/config.toml"
+    regexp: 'laddr = "tcp://127.0.0.1:26657"'
+    line: 'laddr = "tcp://0.0.0.0:26657"'
+
+- name: replace localhost under api section
+  become: true
+  replace:
+    path: "{{ node_home }}/config/app.toml"
+    regexp: 'address = "tcp://localhost:1317"'
+    replace: 'address = "tcp://0.0.0.0:1317"'
+
+- name: Making the change in the CORS section of config.toml
+  become: true
+  lineinfile:
+    path: "{{ node_home }}/config/config.toml"
+    regexp: 'cors_allowed_origins = \[\]'
+    line: 'cors_allowed_origins = ["*"]'
+
+- name: Making the change in the CORS section of app.toml
+  become: true
+  lineinfile:
+    path: "{{ node_home }}/config/app.toml"
+    regexp: "enabled-unsafe-cors = false"
+    line: "enabled-unsafe-cors = true"
+
+- name: set enable to true under api section
+  become: true
+  replace:
+    path: "{{ node_home }}/config/app.toml"
+    regexp: '(?ms)(\[api\][^\[]*enable\s*=\s*)false'
+    replace: '\1true'
+
+- name: Setup cosmovisor for fullnodes
+  become: true
+  shell: "go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest &&  mkdir -p {{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin && mkdir -p {{ user_home }}/{{ node_home }}/cosmovisor/upgrades && cp $GOPATH/bin/{{ daemon }} {{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin/{{ daemon }}"
+  environment:
+    GOPATH: "{{ user_home }}/go"
+    PATH: "{{ path }}"
+  loop: "{{ range(0, fullnode_count) | list }}"
+  when: "inventory_hostname == groups['fullnodes'][item]"
+
+- name: Change ownership of cosmovisor directory
+  become: true
+  command: "chown -R {{ ansible_user }}:{{ ansible_user }} {{ user_home }}/{{ node_home }}/cosmovisor"
+  loop: "{{ range(0, fullnode_count) | list }}"
+  when: "inventory_hostname == groups['fullnodes'][item]"
+
+- name: Replace persistent_peers in config.toml with the extracted content
+  replace:
+    path: "{{ node_home }}/config/config.toml"
+    regexp: '^persistent_peers\s*=.*'
+    replace: "{{ lookup('file', '{{ playbook_dir }}/persistent_peers.txt') }}"
+
+- name: Copy the service file
+  become: true
+  template:
+    src: "{{ playbook_dir }}/templates/node-service.j2"
+    dest: "/etc/systemd/system/{{ network }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ range(0, fullnode_count) | list }}"
+  when: "inventory_hostname == groups['fullnodes'][item]"
+
+- name: Start the service file
+  become: true
+  systemd:
+    name: "{{ network }}"
+    state: started
+    enabled: yes
+  loop: "{{ range(0, fullnode_count) | list }}"
+  when: "inventory_hostname == groups['fullnodes'][item]"
+
+- name: Restart the journald service file
+  become: true
+  shell: systemctl restart systemd-journald.service
+  loop: "{{ range(0, fullnode_count) | list }}"
+  when: "inventory_hostname == groups['fullnodes'][item]"
+
+- name: remove tar files
+  become: true
+  file:
+    path: "{{ user_home }}/{{ node_home }}.tar.gz"
+    state: absent

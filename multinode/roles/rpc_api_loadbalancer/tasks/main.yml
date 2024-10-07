@@ -1,0 +1,108 @@
+---
+- name: Debug droplet IDs
+  debug:
+    var: hostvars['localhost']['droplet_ids']
+
+- name: Create load balancer
+  community.digitalocean.digital_ocean_load_balancer:
+    api_token: "{{ digital_ocean_api_token }}"
+    state: present
+    name: load-balancer-RPC
+    region: "{{ region }}"
+    forwarding_rules:
+      - entry_protocol: http
+        entry_port: 80
+        target_protocol: http
+        target_port: 26657
+    droplet_ids: "{{ hostvars['localhost']['droplet_ids'] }}"
+    health_check:
+      protocol: "http"
+      port: 26657
+      path: "/status"
+      check_interval_seconds: 10
+      response_timeout_seconds: 5
+      healthy_threshold: 5
+      unhealthy_threshold: 3
+  register: rpc_lb_addr
+  run_once: true
+
+- name: Wait for load balancer to become ready
+  wait_for:
+    timeout: 30
+  run_once: true
+
+- name: Get load balancer information by ID
+  community.digitalocean.digital_ocean_load_balancer_info:
+    oauth_token: "{{ digital_ocean_api_token }}"
+    load_balancer_id: "{{ rpc_lb_addr.data.load_balancer.id }}"
+  register: rpc_lb_info
+
+- name: Debug the contents of rpc_lb_info
+  debug:
+    var: rpc_lb_info
+- name: Show Load Balancer IP address
+  debug:
+    msg: "Load Balancer IP: {{ rpc_lb_info.data[0].ip if rpc_lb_info.data[0].ip is defined else 'IP not available yet' }}"
+
+- name: Set lb1 variable to the RPC load balancer IP address
+  set_fact:
+    lb1: "{{ rpc_lb_info.data[0].ip }}"
+  run_once: true
+
+- name: Append RPC load balancer IP address under [loadbalancer] in the inventory file
+  lineinfile:
+    path: "inventory.ini"
+    insertafter: "^\\[loadbalancer\\]"
+    line: "lb1 ansible_host={{ lb1 }}"
+  run_once: true
+  delegate_to: localhost
+
+- name: Create load balancer for API endpoint
+  community.digitalocean.digital_ocean_load_balancer:
+    api_token: "{{ digital_ocean_api_token }}"
+    state: present
+    name: load-balancer-API
+    region: "{{ region }}"
+    forwarding_rules:
+      - entry_protocol: http
+        entry_port: 80
+        target_protocol: http
+        target_port: 1317
+    droplet_ids: "{{ hostvars['localhost']['droplet_ids'] }}"
+    health_check:
+      protocol: "http"
+      port: 1317
+      path: "/cosmos/base/tendermint/v1beta1/node_info"
+      check_interval_seconds: 10
+      response_timeout_seconds: 5
+      healthy_threshold: 5
+      unhealthy_threshold: 3
+  register: api_lb_addr
+  run_once: true
+- name: Wait for load balancer to become ready
+  wait_for:
+    timeout: 30
+  run_once: true
+
+- name: Get load balancer information by ID
+  community.digitalocean.digital_ocean_load_balancer_info:
+    oauth_token: "{{ digital_ocean_api_token }}"
+    load_balancer_id: "{{ api_lb_addr.data.load_balancer.id }}"
+  register: api_info
+
+- name: Show Load Balancer IP address
+  debug:
+    msg: "Load Balancer IP: {{ api_info.data[0].ip if api_info.data[0].ip is defined else 'IP not available yet' }}"
+
+- name: Set lb2 variable to the API load balancer IP address
+  set_fact:
+    lb2: "{{ api_info.data[0].ip }}"
+  run_once: true
+
+- name: Append API load balancer IP address under [loadbalancer] in the inventory file
+  lineinfile:
+    path: "inventory.ini"
+    insertafter: "^\\[loadbalancer\\]"
+    line: "lb2 ansible_host={{ lb2 }}"
+  run_once: true
+  delegate_to: localhost

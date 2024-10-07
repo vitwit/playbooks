@@ -1,0 +1,126 @@
+---
+- name: Send the binaries to respective  validators server
+  copy:
+    src: "{{ playbook_dir }}/{{ node_home }}{{ item }}.tar.gz"
+    dest: "{{ user_home }}/{{ node_home }}.tar.gz"
+  loop: "{{ range(1, validators_count) | list }}"
+  when: "inventory_hostname == groups['validators'][item]"
+
+- name: Unarchive the binary file
+  become: true
+  unarchive:
+    src: "{{ user_home }}/{{ node_home }}.tar.gz"
+    dest: "{{ user_home }}"
+    remote_src: yes
+  loop: "{{ range(1, validators_count) | list }}"
+  when: "inventory_hostname == groups['validators'][item]"
+
+- name: Move binaries
+  become: true
+  command: mv {{ node_home }}{{ item }}  {{ node_home }}
+  loop: "{{ range(1, validators_count) | list }}"
+  when: "inventory_hostname == groups['validators'][item]"
+
+- name: Replace the existing genesis.json
+  become: true
+  copy:
+    src: "{{ playbook_dir }}/genesis.json"
+    dest: "{{ user_home }}/{{ node_home }}/config/genesis.json"
+  loop: "{{ range(1, validators_count) | list }}"
+
+- name: Setup cosmovisor for validators
+  become: true
+  shell: "go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest &&  mkdir -p {{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin && mkdir -p {{ user_home }}/{{ node_home }}/cosmovisor/upgrades && cp $GOPATH/bin/{{ daemon }} {{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin/{{ daemon }}"
+  environment:
+    GOPATH: "{{ user_home }}/go"
+    PATH: "{{ path }}"
+  loop: "{{ range(1, validators_count) | list }}"
+
+- name: Change ownership of cosmovisor directory
+  become: true
+  file:
+    path: "{{ user_home }}/{{ node_home }}/cosmovisor"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    recurse: yes
+  loop: "{{ range(1, validators_count) | list }}"
+
+- name: Extract node-id for all  validators
+  become: true
+  shell: "{{ daemon }} tendermint show-node-id"
+  register: node_ids
+  environment:
+    PATH: "{{ path }}"
+    HOME: "{{ user_home }}"
+  loop: "{{ range(0, 2) | list }}"
+
+- name: Set fact for node-id  addresses
+  set_fact:
+    node_ids_dict: "{{ node_ids_dict | default({}) | combine({item.item : item.stdout}) }}"
+  loop: "{{ node_ids.results }}"
+
+- name: Debug node id 0
+  debug:
+    var: node_ids_dict[0]
+- name: Debug node id 1
+  debug:
+    var: node_ids_dict[1]
+
+- name: Add persistant  peer for validator nodes
+  become: true
+  lineinfile:
+    path: "{{ node_home }}/config/config.toml"
+    regexp: "^persistent_peers ="
+    line: 'persistent_peers = "{{ hostvars["validator0"]["node_ids_dict"][0] }}@{{ validator0_ip }}:26656,{{ hostvars["validator1"]["node_ids_dict"][1] }}@{{ validator1_ip }}:26656"'
+  loop: "{{ range(0, validators_count) | list }}"
+
+- name: Copy the service file
+  become: true
+  template:
+    src: "{{ playbook_dir }}/templates/node-service.j2"
+    dest: "/etc/systemd/system/{{ network }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Start the service file
+  become: true
+  systemd:
+    name: "{{ network }}"
+    state: started
+    enabled: yes
+
+- name: Restart the journald service file
+  become: true
+  shell: systemctl restart systemd-journald.service
+
+- name: Extract persistent_peers from config.toml
+  shell: grep '^persistent_peers =' {{ node_home }}/config/config.toml | head -n 1
+  register: persistent_peers_content
+  run_once: true
+
+- name: Save persistent_peers to a file on the remote host
+  copy:
+    content: "{{ persistent_peers_content.stdout }}"
+    dest: "{{ user_home }}/persistent_peers.txt"
+  run_once: true
+
+- name: Fetch persistent_peers file to the control node
+  fetch:
+    src: "{{ user_home }}/persistent_peers.txt"
+    dest: "{{ playbook_dir }}/persistent_peers.txt"
+    flat: yes
+  run_once: true
+
+- name: Remove persistent_peers.txt
+  become: true
+  file:
+    path: "{{ user_home }}/persistent_peers.txt"
+    state: absent
+  run_once: true  
+
+- name: remove tar files
+  become: true
+  file:
+    path: "{{ user_home }}/{{ node_home }}.tar.gz"
+    state: absent

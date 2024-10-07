@@ -1,0 +1,258 @@
+---
+- name: Create NVM directory
+  file:
+    path: "{{ user_home }}/.nvm"
+    state: directory
+    mode: "0755"
+
+- name: Install nvm
+  get_url:
+    url: https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.4/install.sh
+    dest: "{{ user_home }}/install_nvm.sh"
+    mode: "0755"
+
+- name: Run nvm install script
+  shell: bash "{{ user_home }}/install_nvm.sh"
+  args:
+    executable: /bin/bash
+  environment:
+    NVM_DIR: "{{ user_home }}/.nvm"
+
+- name: Install Node.js
+  shell: >
+    . "{{ user_home }}/.nvm/nvm.sh" &&
+    nvm install v18.19.0
+  environment:
+    NVM_DIR: "{{ user_home }}/.nvm"
+    PATH: "{{ user_home }}/.nvm/versions/node/v18.19.0/bin:{{ ansible_env.PATH }}"
+
+- name: Update user's PATH in .bashrc
+  lineinfile:
+    path: "{{ user_home }}/.bashrc"
+    line: 'export PATH="{{ user_home }}/.nvm/versions/node/v18.19.0/bin:$PATH"'
+  become_user: "{{ ansible_user }}"
+
+- name: Install npm
+  shell: >
+    . "{{ user_home }}/.nvm/nvm.sh" &&
+    nvm install-latest-npm
+  environment:
+    NVM_DIR: "{{ user_home }}/.nvm"
+    PATH: "{{ user_home }}/.nvm/versions/node/v18.19.0/bin:{{ ansible_env.PATH }}"
+
+- name: Install yarn
+  become: true
+  shell: >
+    . "{{ user_home }}/.nvm/nvm.sh" &&
+    npm install --global --unsafe-perm=true yarn
+  environment:
+    NVM_DIR: "{{ user_home }}/.nvm"
+    PATH: "{{ user_home }}/.nvm/versions/node/v18.19.0/bin:{{ ansible_env.PATH }}"
+
+- name: Install ping_explorer
+  become: true
+  git:
+    repo: "{{ ping_repo }}"
+    dest: "{{ user_home }}/explorer"
+    version: "f0120a4a9f1a96f596139f36a9030fd05f227d8b"
+
+- name: Install nginx
+  become: true
+  apt:
+    name: nginx
+    state: present
+    update_cache: yes
+
+- name: Remove contents of mainnet directory
+  file:
+    path: "{{ user_home }}/explorer/chains/mainnet"
+    state: absent
+  become: true
+
+- name: Recreate mainnet directory
+  file:
+    path: "{{ user_home }}/explorer/chains/mainnet"
+    state: directory
+  become: true
+
+- name: Copy the sample json file
+  become: true
+  template:
+    src: "{{ playbook_dir }}/templates/explorer-config.j2"
+    dest: "{{ user_home }}/explorer/chains/mainnet/{{ chain_id }}.json"
+  vars:
+    lb1_ip: "{{ lb1 }}"
+    lb2_ip: "{{ lb2 }}"
+
+- name: Remove contents of /var/www/html
+  become: true
+  file:
+    path: "/var/www/html/"
+    state: absent
+
+- name: Recreate /var/www/html directory
+  become: true
+  file:
+    path: "/var/www/html/"
+    state: directory
+
+- name: Build the explorer
+  become: true
+  shell: >
+    . "{{ user_home }}/.nvm/nvm.sh" && export PATH="{{ ansible_env.PATH }}:{{ user_home }}/.nvm/versions/node/v18.19.0/bin" && cd '{{ user_home }}/explorer' && yarn install --ignore-engines && yarn build
+  args:
+    chdir: "{{ user_home }}/explorer"
+
+- name: Move the data inside dist folder to /var/www/html
+  become: true
+  shell: cp -r dist/* /var/www/html/
+  args:
+    chdir: "{{ user_home }}/explorer"
+
+- name: Install the faucet
+  become: true
+  git:
+    repo: "https://github.com/vitwit/ping-faucet.git"
+    dest: "{{ user_home }}/faucet"
+    version: "multi-chains"
+
+- name: Remove existing config.js file
+  become: true
+  file:
+    path: "{{ user_home }}/faucet/config.js"
+    state: absent
+
+- name: Copy the config.js file
+  become: true
+  template:
+    src: "{{ playbook_dir }}/templates/faucet-config.j2"
+    dest: "{{ user_home }}/faucet/config.js"
+  vars:
+    lb1_ip: "{{ lb1 }}"
+
+- name: Install express using npm
+  become: true
+  shell: >
+    . "{{ user_home }}/.nvm/nvm.sh" &&
+    export PATH="{{ user_home }}/.nvm/versions/node/v18.19.0/bin:$PATH" &&
+    npm install express
+
+- name: Run yarn
+  become: true
+  shell: >
+    . "{{ user_home }}/.nvm/nvm.sh" && export PATH="{{ ansible_env.PATH }}:{{ user_home }}/.nvm/versions/node/v18.19.0/bin" && cd '{{ user_home }}/faucet' && yarn
+
+- name: Copy the service file
+  become: true
+  template:
+    src: "{{ playbook_dir }}/templates/faucet-service.j2"
+    dest: "/etc/systemd/system/faucet.service"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Start the service file
+  become: true
+  systemd:
+    name: faucet
+    state: started
+    enabled: yes
+
+- name: sleep for a few seconds
+  command: sleep 10
+
+- name: Copy the mnemonic from the mnemonic.txt file
+  become: true
+  shell: cat mnemonic.txt
+  args:
+    chdir: "{{ user_home }}/faucet/.faucet"
+  register: faucet_mnemonic
+
+- name: update the mnemonic field in config.js
+  become: true
+  lineinfile:
+    path: "{{ user_home }}/faucet/config.js"
+    regexp: '^\s*mnemonic:\s*"([^"]*)"'
+    line: 'mnemonic: "{{ faucet_mnemonic.stdout }}",'
+
+- name: Add the faucet address to the keyring
+  become: true
+  shell: "echo '{{ faucet_mnemonic.stdout }}' | {{ daemon }} keys add faucet{{ item }} --recover --keyring-backend test"
+  environment:
+    PATH: "{{ path }}"
+    HOME: "{{ user_home }}"
+  loop: "{{ range(0, fullnode_count) | list }}"
+  when: "inventory_hostname == groups['fullnodes'][item]"
+  become_user: "{{ ansible_user }}"
+  become_method: sudo
+
+- name: listing all the keys in keyring
+  shell: "{{ daemon }} keys list --keyring-backend test"
+  register: list_key
+  environment:
+    PATH: "{{ path }}"
+
+- name: Debug the keyring output
+  debug:
+    var: list_key.stdout_lines
+
+- name: Debug the user dir
+  debug:
+    msg: "User Directory: {{ user_home }}"
+
+- name: Retrieve the faucet addresses for all validators
+  become: true
+  shell: "{{ daemon }} keys show -a faucet{{ item }} --keyring-backend test"
+  register: faucet_addr_results
+  environment:
+    PATH: "{{ path }}"
+    HOME: "{{ user_home }}"
+  loop: "{{ range(0, fullnode_count) | list }}"
+  when: inventory_hostname == groups['fullnodes'][item]
+
+- name: Debug the faucet_addr_results
+  debug:
+    var: faucet_addr_results
+
+- name: Store faucet addresses in a dictionary
+  set_fact:
+    faucet_addresses: "{{ faucet_addresses | default({}) | combine({item: (faucet_addr_results.results[item].stdout if 'stdout' in faucet_addr_results.results[item] else 'skipped') }) }}"
+  loop: "{{ range(0, fullnode_count) | list }}"
+
+- name: Debug the faucet addresses
+  debug:
+    var: faucet_addresses
+
+- name: Transfer funds from genesis account to the faucet account
+  shell: "{{ daemon }} tx bank send {{ fullnode_key }}{{ item }} {{ faucet_addr_results.results[item].stdout }} 10000000000{{ denom }} --keyring-backend test --chain-id {{ chain_id }} -y"
+  environment:
+    PATH: "{{ path }}"
+  loop: "{{ range(0, fullnode_count) | list }}"
+  when: inventory_hostname == groups['fullnodes'][item]
+
+- name: Create load balancer for the explorer and faucet
+  community.digitalocean.digital_ocean_load_balancer:
+    api_token: "{{ digital_ocean_api_token }}"
+    state: present
+    name: explorer-loadbalancer
+    region: "{{ region }}"
+    forwarding_rules:
+      - entry_protocol: http
+        entry_port: 80
+        target_protocol: http
+        target_port: 80
+
+      - entry_protocol: http
+        entry_port: 83
+        target_protocol: http
+        target_port: 83
+    droplet_ids: "{{ hostvars['localhost']['droplet_ids'] }}"
+    health_check:
+      protocol: "http"
+      port: 83
+      path: "/"
+      check_interval_seconds: 10
+      response_timeout_seconds: 5
+      healthy_threshold: 5
+      unhealthy_threshold: 3
+  when: inventory_hostname == "fullnode0"

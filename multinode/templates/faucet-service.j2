@@ -1,0 +1,13 @@
+ [Unit]
+ Description=Faucet Service
+ After=network.target
+
+ [Service]
+ ExecStart={{ user_home }}/.nvm/versions/node/v18.19.0/bin/node --es-module-specifier-resolution=node {{ user_home }}/faucet/faucet.js
+ WorkingDirectory={{ user_home }}/faucet
+ Restart=always
+ RestartSec=3
+ LimitNOFILE=4096
+ 
+ [Install]
+ WantedBy=multi-user.target
