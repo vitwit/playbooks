@@ -1,0 +1,53 @@
+---
+- name: Download go tar file
+  get_url:
+    url: https://go.dev/dl/go{{go_version}}.linux-amd64.tar.gz
+    dest: /tmp/go{{go_version}}.linux-amd64.tar.gz
+  become: true
+
+- name: Delete previous installation
+  file:
+    path: /usr/local/go
+    state: absent
+  become: true
+
+- name: Extract and move new go folder to /usr/local
+  unarchive:
+    src: /tmp/go{{go_version}}.linux-amd64.tar.gz
+    dest: /usr/local
+    remote_src: yes
+  become: true
+
+- name: Delete downloaded tar file
+  file:
+    path: /tmp/go{{go_version}}.linux-amd64.tar.gz
+    state: absent
+  become: true
+
+- name: Set Go environment variables in ~/.profile
+  lineinfile:
+    path: ~/.profile
+    line: |
+      export GOROOT=/usr/local/go
+      export GOPATH={{ user_home }}/go
+      export GOBIN=$GOPATH/bin
+      export PATH=$PATH:/usr/local/go/bin:$GOBIN
+    create: true
+    state: present
+
+- name: Download ipfs tar file
+  get_url:
+    url: https://dist.ipfs.io/go-ipfs/v0.30.0/go-ipfs_v0.30.0_linux-amd64.tar.gz
+    dest: /tmp/ipfs.linux-amd64.tar.gz
+  become: true
+
+- name: Extract and move go-ipfs to a new location
+  unarchive:
+    src: /tmp/ipfs.linux-amd64.tar.gz
+    dest: "{{ user_home }}/"
+    remote_src: yes
+
+- name: Move the ipfs binary to its respective folder
+  shell: mv "{{ user_home }}/go-ipfs/ipfs" /usr/local/bin
+  become: true
+  

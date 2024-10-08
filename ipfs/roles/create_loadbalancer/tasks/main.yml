@@ -1,0 +1,22 @@
+- name: Create load balancer
+  community.digitalocean.digital_ocean_load_balancer:
+    api_token: "{{ digital_ocean_api_token }}"
+    state: present
+    name: ipfs-gateway
+    region: "{{ region }}"
+    forwarding_rules:
+      - entry_protocol: http
+        entry_port: 80
+        target_protocol: http
+        target_port: 8080
+    droplet_ids: "{{ droplet_ids }}"
+    health_check:
+      protocol: "http"
+      port: 8080
+      path: "/ipfs"
+      check_interval_seconds: 10
+      response_timeout_seconds: 5
+      healthy_threshold: 5
+      unhealthy_threshold: 3
+  run_once: true
+  
