@@ -1,0 +1,81 @@
+---
+- name: Get DigitalOcean SSH Key ID
+  uri:
+    url: "https://api.digitalocean.com/v2/account/keys"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ digital_ocean_api_token }}"
+    return_content: yes
+  register: ssh_key_response
+
+- name: Parse SSH Key ID
+  set_fact:
+    ssh_key_id: "{{ (ssh_key_response.json | json_query(query)) | first }}"
+  vars:
+    query: "ssh_keys[?name=='{{ ssh_key_name }}'].id"
+
+- name: Ensure SSH key ID was found
+  fail:
+    msg: "SSH key '{{ ssh_key_name }}' not found in DigitalOcean account."
+  when: ssh_key_id is not defined
+
+- name: Read file contents
+  slurp:
+    src: "{{ ssh_file_path }}"
+  register: ssh_content
+- name: Store SSH key contents into a variable
+  set_fact:
+    ssh_key_variable: "{{ ssh_content['content'] | b64decode }}"
+- name: Create ipfs node  Droplet
+  digital_ocean_droplet:
+    state: present
+    name: "node{{ item }}"
+    size: s-2vcpu-4gb
+    image: ubuntu-22-04-x64
+    region: "{{ region }}"
+    ssh_keys: "{{ ssh_key_id }}"
+    monitoring: false
+    ipv6: false
+    user_data: |
+      #cloud-config
+      users:
+        - name: {{ user }}
+          groups: sudo
+          sudo: "ALL=(ALL) NOPASSWD:ALL"
+          shell: /bin/bash
+          ssh-authorized-keys:
+            - {{ ssh_key_variable  }}
+    api_token: "{{ digital_ocean_api_token }}"
+  with_sequence: start=0 end={{ 2 }}
+  register: do1
+
+- name: Pause for a while to allow SSH to become active
+  pause:
+    seconds: 60
+
+- name: Extract IP addresses
+  set_fact:
+    droplet_ids: "{{ do1.results | json_query('[].data.droplet.id') | flatten }}"
+    ip_addresses: "{{ do1.results | json_query('[].data.droplet.networks.v4[0].ip_address') | flatten }}"
+
+- name: Reverse IP addresses list
+  set_fact:
+    reversed_ip_addresses: "{{ ip_addresses | zip(range(3)) | list | reverse }}"
+- name: Append IP addresses to .inventory file under [nodes]
+  lineinfile:
+    path: "inventory.ini"
+    insertafter: "^\\[nodes\\]"
+    line: "node{{ item.1 }} ansible_host={{ item.0 }} ansible_user={{ user }}"
+  loop: "{{ reversed_ip_addresses }}"
+  loop_control:
+    label: "{{ item[0] }}"
+
+- name: Add new nodes to inventory
+  add_host:
+    name: "node{{ item.1 }}"
+    ansible_host: "{{ item.0 }}"
+    ansible_user: "{{ user }}"
+    groups: nodes
+  loop: "{{ ip_addresses | zip(range(3)) | list }}"
+  loop_control:
+    label: "{{ item[0] }}"
