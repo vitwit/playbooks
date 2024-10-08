@@ -8,7 +8,7 @@ ExecStart={{ user_home }}/go/bin/ipfs-cluster-service daemon
 User={{ansible_user}}
 Restart=always
 RestartSec=3
-LimitNOFILE=65536
+LimitNOFILE=4096
 Environment="CLUSTER_SECRET={{ hostvars["node0"].cluster_secret }}"
 Environment=LIBP2P_FORCE_PNET=1
 [Install]
