@@ -35,10 +35,6 @@
     create: true
     state: present
 
-- name: sleep for a few seconds
-  pause:
-    seconds: 20
-
 - name: Download ipfs tar file
   get_url:
     url: https://dist.ipfs.io/go-ipfs/v0.30.0/go-ipfs_v0.30.0_linux-amd64.tar.gz
