@@ -1,0 +1,34 @@
+---
+- name: Create Droplets
+  hosts: localhost
+  roles:
+    - droplet_create
+
+- name: Install Golang and IPFS
+  vars:
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+  hosts: nodes
+  roles:
+    - installations
+
+- name: Setup ipfs
+  vars:
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+  hosts: nodes
+  roles:
+    - ipfs_setup
+
+- name: Setup ipfs cluster
+  vars:
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+  hosts: nodes
+  roles:
+    - ipfs_cluster
+
+- name: Create load balancer
+  vars:
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+  hosts: localhost
+  roles:
+    - create_loadbalancer
+

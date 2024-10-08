@@ -1,0 +1,14 @@
+[Unit]
+Description=IPFS-Cluster Daemon
+Requires=ipfs
+After=syslog.target network.target remote-fs.target nss-lookup.target ipfs
+[Service]
+Type=simple
+ExecStart={{ user_home }}/go/bin/ipfs-cluster-service daemon
+User={{ansible_user}}
+Restart=always
+RestartSec=3
+LimitNOFILE=4096
+Environment="CLUSTER_SECRET={{ hostvars["node0"].cluster_secret }}"
+[Install]
+WantedBy=multi-user.target
