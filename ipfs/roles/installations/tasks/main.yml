@@ -54,3 +54,4 @@
 - name: Move the ipfs binary to its respective folder
   shell: mv "{{ user_home }}/go-ipfs/ipfs" /usr/local/bin
   become: true
+  
