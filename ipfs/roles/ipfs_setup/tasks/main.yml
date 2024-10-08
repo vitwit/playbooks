@@ -50,18 +50,10 @@
 
 - name: Run the bootstrap command
   shell: "ipfs bootstrap add /ip4/{{ hostvars[groups['nodes'][0]].ansible_host }}/tcp/4001/ipfs/{{ ipfs_id }}"
-  become: true
   environment:
     PATH: "{{ path }}"
     IPFS_PATH: "{{ ansible_env.HOME }}/.ipfs"
   register: bootstrap_result
-
-- name: Set the environment variable
-  lineinfile:
-    path: ~/.profile
-    line: export LIBP2P_FORCE_PNET=1
-    create: true
-    state: present
 
 - name: Change ownership of the IPFS config file
   file:
