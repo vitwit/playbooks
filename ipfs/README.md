@@ -20,7 +20,7 @@ All necessary software installations are performed on their respective servers, 
 
 Ansible creates a privates IPFS network comprising of 1 main node and 2 sub nodes.
 
-4. IPFS Clsuter
+4. IPFS Cluster
 
 Ansible creates an IPFS cluster among the main node and the sub nodes.
 
