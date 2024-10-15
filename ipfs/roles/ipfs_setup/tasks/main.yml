@@ -1,0 +1,95 @@
+---
+- name: Initialize ipfs
+  command: ipfs init
+  environment:
+    PATH: "{{ path }}"
+
+- name: Create a private network
+  command: go install github.com/Kubuxu/go-ipfs-swarm-key-gen/ipfs-swarm-key-gen@latest
+  environment:
+    PATH: "{{ path }}"
+  when: inventory_hostname == "node0"
+
+- name: Run swarm on the main node
+  shell: "ipfs-swarm-key-gen > {{ user_home }}/.ipfs/swarm.key 2>&1 &"
+  environment:
+    PATH: "{{ path }}"
+    IPFS_PATH: "{{ ansible_env.HOME }}/.ipfs"
+  when: inventory_hostname == "node0"
+
+- name: Fetch the swarm key from the main node to the playbook
+  fetch:
+    src: ".ipfs/swarm.key"
+    dest: "{{ playbook_dir }}/swarm.key"
+    flat: yes
+  when: inventory_hostname == "node0"
+
+- name: Send the swarm key to other ipfs instances
+  copy:
+    src: "{{ playbook_dir }}/swarm.key"
+    dest: ".ipfs/swarm.key"
+  loop: "{{ range(1, 3) | list }}"
+  when: "inventory_hostname == groups['nodes'][item]"
+
+- name: Run the bootstrap command
+  shell: /usr/local/bin/ipfs bootstrap rm --all
+  environment:
+    PATH: "{{ path }}"
+    IPFS_PATH: "{{ ansible_env.HOME }}/.ipfs"
+
+- name: Run IPFS id command
+  command: ipfs id
+  register: ipfs_id_output
+  when: inventory_hostname == "node0"
+
+- name: Set the global IPFS ID fact for all hosts
+  set_fact:
+    ipfs_id: "{{ hostvars['node0']['ipfs_id_output'].stdout | from_json | json_query('ID') }}"
+  delegate_to: localhost
+  run_once: true
+
+- name: Run the bootstrap command
+  shell: "ipfs bootstrap add /ip4/{{ hostvars[groups['nodes'][0]].ansible_host }}/tcp/4001/ipfs/{{ ipfs_id }}"
+  environment:
+    PATH: "{{ path }}"
+    IPFS_PATH: "{{ ansible_env.HOME }}/.ipfs"
+  register: bootstrap_result
+
+- name: Change ownership of the IPFS config file
+  file:
+    path: "{{ user_home }}/.ipfs/config"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    state: file
+  become: true
+
+- name: Replace the API gateway ip
+  shell: sed -i 's|/ip4/127.0.0.1/tcp/8080|/ip4/0.0.0.0/tcp/8080|' ~/.ipfs/config
+  environment:
+    IPFS_PATH: "{{ ansible_env.HOME }}/.ipfs"
+
+- name: Copy the ipfs service file
+  become: true
+  template:
+    src: "{{ playbook_dir }}/templates/ipfs-service.j2"
+    dest: "/etc/systemd/system/ipfs.service"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+
+- name: Start the service file
+  become: true
+  systemd:
+    name: ipfs
+    state: started
+    enabled: yes
+
+- name: Restart the journald service file
+  become: true
+  shell: systemctl restart systemd-journald.service
+
+- name: Restart the IPFS service
+  become: true
+  systemd:
+    name: ipfs
+    state: restarted

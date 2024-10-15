@@ -1,0 +1,142 @@
+---
+- name: Install make
+  package:
+    name: make
+    state: present
+  become: true
+
+- name: Clone ipfs cluster git repository
+  git:
+    repo: "https://github.com/ipfs/ipfs-cluster.git"
+    dest: "{{ user_home }}/go/src/github.com/ipfs/ipfs-cluster"
+
+- name: Ensure correct ownership for ipfs cluster
+  file:
+    path: "{{ user_home }}/go/src/github.com/ipfs/ipfs-cluster"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0755"
+    state: directory
+  become: true
+
+- name: Run make install
+  shell: make install
+  args:
+    chdir: "{{ user_home }}/go/src/github.com/ipfs/ipfs-cluster"
+  environment:
+    PATH: "{{ path }}"
+
+- name: Generate a random cluster secret
+  shell: "head -c 32 /dev/urandom | xxd -p -c 32"
+  register: cluster_secret_output
+  when: inventory_hostname == "node0"
+
+- name: Set the cluster secret fact
+  set_fact:
+    cluster_secret: "{{ cluster_secret_output.stdout }}"
+  when: inventory_hostname == "node0"
+
+- name: Add CLUSTER_SECRET to .bashrc on all nodes
+  lineinfile:
+    path: "{{ ansible_env.HOME }}/.bashrc"
+    create: yes
+    line: 'export CLUSTER_SECRET={{ hostvars["node0"].cluster_secret }}'
+    state: present
+
+- name: Source .bashrc to apply changes
+  shell: "source {{ ansible_env.HOME }}/.bashrc"
+  args:
+    executable: /bin/bash
+
+- name: Initialize ipfs cluster
+  shell: ipfs-cluster-service init
+  environment:
+    PATH: "{{ path }}"
+    IPFS_PATH: "{{ ansible_env.HOME }}/.ipfs"
+
+- name: Copy the ipfs-cluster service file for the main node
+  become: true
+  template:
+    src: "{{ playbook_dir }}/templates/ipfs-cluster-main.j2"
+    dest: "/etc/systemd/system/ipfs-cluster.service"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+  when: inventory_hostname == "node0"
+
+- name: Start the service file
+  become: true
+  systemd:
+    name: ipfs-cluster
+    state: started
+    enabled: yes
+  when: inventory_hostname == "node0"
+
+- name: Restart the journald service file
+  become: true
+  shell: systemctl restart systemd-journald.service
+  when: inventory_hostname == "node0"
+
+- name: Restart the IPFS service
+  become: true
+  systemd:
+    name: ipfs-cluster
+    state: restarted
+  when: inventory_hostname == "node0"
+
+- name: Run ipfs-cluster-ctl id and capture the peer ID
+  shell: "ipfs-cluster-ctl id"
+  register: ipfs_cluster_output
+  when: inventory_hostname == "node0"
+  environment:
+    PATH: "{{ path }}"
+  become: true
+
+- name: Extract the peer ID before the | character
+  set_fact:
+    peer_id: "{{ ipfs_cluster_output.stdout | regex_search('^([a-zA-Z0-9]+)') }}"
+  when: inventory_hostname == "node0"
+
+- name: Set peer_id fact for all nodes
+  set_fact:
+    peer_id: "{{ hostvars['node0'].peer_id }}"
+
+- name: Copy the ipfs cluster service file for the sub nodes
+  become: true
+  template:
+    src: "{{ playbook_dir }}/templates/ipfs-cluster.j2"
+    dest: "/etc/systemd/system/ipfs-cluster.service"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+  loop: "{{ range(1, 3) | list }}"
+  when: "inventory_hostname == groups['nodes'][item]"
+
+- name: Start the service file
+  become: true
+  systemd:
+    name: ipfs-cluster
+    state: started
+    enabled: yes
+  loop: "{{ range(1, 3) | list }}"
+  when: "inventory_hostname == groups['nodes'][item]"
+
+- name: Restart the journald service file
+  become: true
+  shell: systemctl restart systemd-journald.service
+  loop: "{{ range(1, 3) | list }}"
+  when: "inventory_hostname == groups['nodes'][item]"
+
+- name: Restart the IPFS service
+  become: true
+  systemd:
+    name: ipfs-cluster
+    state: restarted
+  loop: "{{ range(1, 3) | list }}"
+  when: "inventory_hostname == groups['nodes'][item]"
+
+- name: Remove swarm key from the playbook directory
+  file:
+    path: "{{ playbook_dir }}/swarm.key"
+    state: absent
+  delegate_to: localhost
