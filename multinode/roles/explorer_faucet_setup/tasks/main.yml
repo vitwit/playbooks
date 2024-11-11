@@ -18,13 +18,28 @@
   environment:
     NVM_DIR: "{{ user_home }}/.nvm"
 
+# - name: Install Node.js
+#   shell: >
+#     . "{{ user_home }}/.nvm/nvm.sh" &&
+#     nvm install v18.19.0
+#   environment:
+#     NVM_DIR: "{{ user_home }}/.nvm"
+#     PATH: "{{ user_home }}/.nvm/versions/node/v18.19.0/bin:{{ ansible_env.PATH }}"
+
 - name: Install Node.js
-  shell: >
-    . "{{ user_home }}/.nvm/nvm.sh" &&
-    nvm install v18.19.0
+  shell: |
+    export NVM_DIR="{{ user_home }}/.nvm"
+    . "$NVM_DIR/nvm.sh"
+    nvm install v18.19.0 --verbose
   environment:
     NVM_DIR: "{{ user_home }}/.nvm"
     PATH: "{{ user_home }}/.nvm/versions/node/v18.19.0/bin:{{ ansible_env.PATH }}"
+  retries: 3
+  delay: 10
+  register: node_install_result
+  until: node_install_result.rc == 0
+
+
 
 - name: Update user's PATH in .bashrc
   lineinfile:

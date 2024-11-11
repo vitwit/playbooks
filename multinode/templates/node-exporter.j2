@@ -1,0 +1,11 @@
+[Unit]
+Description=Node_exporter
+After=network-online.target
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/node_exporter
+Restart=always
+RestartSec=3
+LimitNOFILE=4096
+[Install]
+WantedBy=multi-user.target

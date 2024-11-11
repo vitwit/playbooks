@@ -1,0 +1,149 @@
+
+## TO BE RUN ON HOSTS FULLNODES AND VALIDATORS
+---
+- name: Install node exporter
+  get_url:
+    url: https://github.com/prometheus/node_exporter/releases/download/v1.8.2/node_exporter-1.8.2.linux-amd64.tar.gz
+    dest: "{{ user_home  }}"
+
+- name: Unarchive node exporter
+  unarchive:
+    remote_src: yes
+    src: "{{ user_home  }}/node_exporter-1.8.2.linux-amd64.tar.gz"
+    dest: "{{ user_home  }}"
+
+- name: Move the node exporter to /usr/local/bin 
+  become: true
+  copy:
+    src: "{{ user_home  }}/node_exporter-1.8.2.linux-amd64/node_exporter"
+    dest: /usr/local/bin/node_exporter
+    remote_src: yes 
+
+- name: Remove the tar files from the  folder
+  become: true
+  file:
+    path: "{{ user_home  }}/node_exporter-1.8.2.linux-amd64.tar.gz"
+    state: absent
+
+- name: Copy the node_exporter service file
+  become: true
+  template: 
+    src: "{{ playbook_dir }}/templates/node-exporter.j2"    
+    dest: "/etc/systemd/system/node-exporter.service"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+
+- name: Change node_exporter permissions
+  become: true
+  shell: chmod +x /usr/local/bin/node_exporter    
+
+- name: Start the service file
+  become: true
+  systemd:
+    name: node-exporter
+    state: started
+    enabled: yes
+
+- name: install unzip
+  apt: 
+    name: unzip
+    state: present
+  become: true
+
+- name: Install promtail 
+  get_url:
+    url: https://github.com/grafana/loki/releases/download/v3.2.0/promtail-linux-amd64.zip
+    dest: "{{ user_home }}"
+
+- name: Unarchive promtail
+  unarchive:
+    remote_src: yes
+    src: "{{ user_home }}/promtail-linux-amd64.zip"
+    dest: "{{ user_home }}"
+
+- name: Copy promtail to  /usr/local/bin
+  become: true
+  copy:
+    src: "{{ user_home }}/promtail-linux-amd64"
+    dest: /usr/local/bin/promtail
+    remote_src: yes
+
+- name: Copy the promtail service file
+  become: true
+  template: 
+    src: "{{ playbook_dir }}/templates/promtail-service.j2"    
+    dest: "/etc/systemd/system/promtail.service"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"    
+
+- name: Copy the promtail config file /usr/local/bin for fullnode servers
+  become: true
+  template:
+    src: "{{ playbook_dir }}/templates/promtail-config.j2"
+    dest: "/usr/local/bin/promtail-config.yaml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  loop: "{{ range(0, fullnode_count) | list }}"
+  loop_control:
+    index_var: item
+  vars:
+    node_name:  "fullnode{{ item }}"
+  when: "inventory_hostname == groups['fullnodes'][item]"  
+
+- name: Copy the promtail config file /usr/local/bin for validator servers
+  become: true
+  template:
+    src: "{{ playbook_dir }}/templates/promtail-config.j2"
+    dest: "/usr/local/bin/promtail-config.yaml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  loop: "{{ range(0, validators_count) | list }}"
+  loop_control:
+    index_var: item
+  vars:
+    node_name: "validator{{ item }}"  
+  when: "inventory_hostname == groups['validators'][item]"   
+
+- name: Change node_exporter permissions
+  become: true
+  shell: chmod +x /usr/local/bin/promtail    
+
+- name: Start the promtail service
+  become: true
+  systemd:
+    name: promtail
+    state: started
+    enabled: yes   
+
+- name: Restart the journald service file
+  become: true
+  shell: systemctl restart systemd-journald.service  
+
+- name: Delete promtail-linux-amd64 file on the home directory
+  file:
+    path: "{{ user_home }}/promtail-linux-amd64"
+    state: absent
+  become: true  
+
+- name: Delete promtail-linux-amd64 zip  file on the home directory
+  file:
+    path: "{{ user_home }}/promtail-linux-amd64.zip"
+    state: absent
+  become: true    
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+  

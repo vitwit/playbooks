@@ -48,3 +48,18 @@
   hosts: localhost
   roles:
     - Cleanup_playbook
+
+
+- name: Grafana Setup
+  hosts: monitoring
+  vars:
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+  roles: 
+    - grafana
+
+- name: Installations for monitoring
+  hosts: validators:fullnodes
+  vars:
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+  roles: 
+    - monitoring_install 

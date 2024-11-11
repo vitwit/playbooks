@@ -56,6 +56,20 @@
     regexp: "enabled-unsafe-cors = false"
     line: "enabled-unsafe-cors = true"
 
+- name: Replace prometheus value in config.toml
+  become: true
+  replace:
+    path: "{{ node_home }}/config/config.toml"
+    regexp: 'prometheus = false'
+    replace: 'prometheus = true'
+
+- name: Replace namespace value in config.toml
+  become: true
+  replace:
+    path: "{{ node_home }}/config/config.toml"
+    regexp: 'namespace = "cometbft"'
+    replace: 'namespace = "tendermint"'
+
 - name: set enable to true under api section
   become: true
   replace:
@@ -83,6 +97,15 @@
     path: "{{ node_home }}/config/config.toml"
     regexp: '^persistent_peers\s*=.*'
     replace: "{{ lookup('file', '{{ playbook_dir }}/persistent_peers.txt') }}"
+
+- name: Ensure log file exists
+  become: true
+  file:
+    path: /var/log/{{ network }}.log
+    state: touch
+    owner: "{{ ansible_user }}"
+    mode: '0644'
+
 
 - name: Copy the service file
   become: true

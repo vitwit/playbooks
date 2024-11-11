@@ -1,0 +1,186 @@
+- name: Install Grafana on Ubuntu
+  become: true
+  block:
+    - name: Install prerequisites
+      apt:
+        name: software-properties-common
+        state: present
+
+    - name: Add Grafana GPG key
+      apt_key:
+        url: https://packages.grafana.com/gpg.key
+        state: present
+
+    - name: Add Grafana repository
+      apt_repository:
+        repo: "deb https://packages.grafana.com/oss/deb stable main"
+        state: present
+        update_cache: yes
+
+    - name: Install Grafana
+      apt:
+        name: grafana
+        state: present
+
+    - name: Start and enable Grafana service
+      systemd:
+        name: grafana-server
+        enabled: yes
+        state: started
+
+
+- name: Install Prometheus
+  block:
+    - name: Create Prometheus user
+      become: true
+      user:
+        name: prometheus
+        shell: /bin/false
+        system: yes
+
+    - name: Install prometheus tar file
+      get_url:
+        url: https://github.com/prometheus/prometheus/releases/download/v2.53.2/prometheus-2.53.2.linux-amd64.tar.gz
+        dest: "{{ user_home }}"
+
+    - name: Unarchive prometheus tar file
+      unarchive:
+        remote_src: yes
+        src: "{{ user_home }}/prometheus-2.53.2.linux-amd64.tar.gz"
+        dest: "{{ user_home }}"
+
+    - name: Create Prometheus directories with correct ownership and permissions
+      become: true
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ user }}"
+        group: "{{ user }}"
+        mode: '0755'
+      loop:
+        - /etc/prometheus
+        - /var/lib/prometheus
+
+    - name: Move the binaries and Prometheus directories
+      become: true
+      shell: |
+        mv prometheus /usr/local/bin && \
+        mv promtool /usr/local/bin && \
+        mv consoles /etc/prometheus && \
+        mv console_libraries /etc/prometheus && \
+        mv prometheus.yml /etc/prometheus
+      args:
+        chdir: "{{ user_home }}/prometheus-2.53.2.linux-amd64"
+
+    - name: Change ownership of Prometheus files and directories
+      become: true
+      file:
+        path: "{{ item }}"
+        owner: "{{ user }}"
+        group: "{{ user }}"
+        mode: '0755'
+      loop:
+        - /usr/local/bin/prometheus
+        - /usr/local/bin/promtool
+        - /etc/prometheus/prometheus.yml
+        - /etc/prometheus/consoles
+        - /etc/prometheus/console_libraries
+
+    - name: Configure Prometheus
+      become: true
+      template:
+        src: "{{ playbook_dir }}/templates/prometheus.j2"
+        dest: /etc/prometheus/prometheus.yml
+
+    - name: Copy the Prometheus service file
+      become: true
+      template:
+        src: "{{ playbook_dir }}/templates/prometheus-service.j2"
+        dest: "/etc/systemd/system/prometheus.service"
+        owner: "{{ user }}"
+        group: "{{ user }}"
+        mode: "0644"
+
+    - name: Start the Prometheus service
+      become: true
+      systemd:
+        name: prometheus
+        state: started
+        enabled: yes
+
+- name: Install Grafana Loki
+  block:
+    - name: Download the Loki zip file
+      get_url:
+        url: https://github.com/grafana/loki/releases/download/v3.2.0/loki-linux-amd64.zip
+        dest: "{{ user_home }}/loki-linux-amd64.zip"
+
+    - name: sleep for a few seconds
+      pause:
+        seconds: 30    
+
+    - name: Install unzip
+      become: true
+      apt:
+        name: unzip
+        state: present
+
+    - name: Unzip the Loki file
+      unarchive:
+        remote_src: yes
+        src: "{{ user_home }}/loki-linux-amd64.zip"
+        dest: "{{ user_home }}"
+
+    - name: Move the Loki binary to /usr/local/bin
+      become: true
+      copy:
+        src: "{{ user_home }}/loki-linux-amd64"
+        dest: /usr/local/bin/loki
+        remote_src: yes
+
+    - name: Create Loki config directory
+      become: true
+      file:
+        path: /etc/loki
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Copy the Loki config file
+      become: true
+      template:
+        src: "{{ playbook_dir }}/templates/loki-config.j2"
+        dest: "/etc/loki/loki-config.yaml"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Copy the Loki service file
+      become: true
+      template:
+        src: "{{ playbook_dir }}/templates/loki-service.j2"
+        dest: "/etc/systemd/system/loki.service"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Change Loki permissions
+      become: true
+      shell: chmod a+x /usr/local/bin/loki    
+
+    - name: Reload systemd daemon
+      become: true
+      systemd:
+        daemon_reload: yes
+
+    - name: Start and enable the Loki service
+      become: true
+      systemd:
+        name: loki
+        state: started
+        enabled: yes
+
+    - name: Restart the journald service file
+      become: true
+      shell: systemctl restart systemd-journald.service    

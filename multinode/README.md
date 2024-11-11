@@ -8,6 +8,7 @@ This ansible playbook automates the setup of a multinode network, consisting of 
 2. Validator nodes
 3. Explorer
 4. Faucet
+5. Grafana monitoring
 
 ## Pre-requisites
 1. Ansible
@@ -35,6 +36,10 @@ Once the nodes are up and running, a load balancer is created for the full nodes
 5. Explorer and Faucet Setup
 
 After the nodes are operational, an explorer and a faucet are set up for the multi-node network. The faucet allows users to request test funds for the network, while the explorer (built using Node.js, Yarn, and Nginx) connects to the blockchain to provide real-time data about the network. A single load balancer is set up to provide access to both the explorer and the faucet. The load balancer IP for these services can also be found in the networking section of your DigitalOcean dashboard.
+
+6. Grafana Monitoring
+
+Monitoring is set up for all the instances used. To check out the monitoring setup, scroll down to the [Steps to setup monitoring](#steps-to-setup-monitoring) section.
 
 # Steps to deploy the playbook
 
@@ -88,4 +93,18 @@ ansible-playbook main.yml  -i inventory.ini
 5. To view the explorer, enter the explorer-load balancer IP. For the faucet, enter explorer-load balancer IP:83.
 Initially, refresh the faucet page (Ctrl + Shift + R) until the Faucet Address and balance fields are visible.
 ## NOTE: To rerun the playbook, remove the fields in the inventory generated under: 
-### [validators] ,[fullnodes], [loadbalancer]
+### [validators] ,[fullnodes], [loadbalancer], [monitoring]
+
+
+## Steps to setup monitoring
+
+1. To setup monitoring enter the monitoring server ip:3000 to login into grafana. By default the username is admin.Setup the new password there if required.
+
+2. In the data sources section of grafana add prometheus and loki data sources.
+
+3. Go to the dashboard section and click on new on the top right side and then on import.
+
+4. Go to the dashboard directory and copy contents of any dashboard and then import that dashboard. Similarly repeat the process for other two and save those dashboards.
+
+
+

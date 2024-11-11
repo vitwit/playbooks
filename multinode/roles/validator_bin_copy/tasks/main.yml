@@ -74,6 +74,14 @@
     line: 'persistent_peers = "{{ hostvars["validator0"]["node_ids_dict"][0] }}@{{ validator0_ip }}:26656,{{ hostvars["validator1"]["node_ids_dict"][1] }}@{{ validator1_ip }}:26656"'
   loop: "{{ range(0, validators_count) | list }}"
 
+- name: Ensure log file exists
+  become: true
+  file:
+    path: /var/log/{{ network }}.log
+    state: touch
+    owner: "{{ ansible_user }}"
+    mode: '0644'
+
 - name: Copy the service file
   become: true
   template:
@@ -83,6 +91,20 @@
     group: root
     mode: "0644"
 
+- name: Replace prometheus value in config.toml
+  become: true
+  replace:
+    path: "{{ node_home }}/config/config.toml"
+    regexp: 'prometheus = false'
+    replace: 'prometheus = true'
+
+- name: Replace namespace value in config.toml
+  become: true
+  replace:
+    path: "{{ node_home }}/config/config.toml"
+    regexp: 'namespace = "cometbft"'
+    replace: 'namespace = "tendermint"'    
+   
 - name: Start the service file
   become: true
   systemd:
