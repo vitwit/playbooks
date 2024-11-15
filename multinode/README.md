@@ -39,7 +39,14 @@ After the nodes are operational, an explorer and a faucet are set up for the mul
 
 6. Grafana Monitoring
 
-Monitoring is set up for all the instances used. To check out the monitoring setup, scroll down to the [Steps to setup monitoring](#steps-to-setup-monitoring) section.
+The monitoring setup includes:
+  - Prometheus for collecting metrics from nodes
+  - Loki for aggregating logs
+  - Node Exporter for system metrics
+  - Grafana dashboards for:
+  - Tendermint metrics (blockchain performance, consensus, etc.)
+  - System metrics (CPU, memory, disk usage)
+  - For setup instructions, see the [Steps to setup monitoring](#steps-to-setup-monitoring) section.
 
 # Steps to deploy the playbook
 
@@ -57,7 +64,7 @@ Additionally, you can modify the fields shown below:"
 ```ini
 denom=atom
 minimum_gas_price=0atom
-user=root
+user=ubuntu
 validator_key=test1
 fullnode_key=test2
 fullnode_count=2
@@ -96,15 +103,45 @@ Initially, refresh the faucet page (Ctrl + Shift + R) until the Faucet Address a
 ### [validators] ,[fullnodes], [loadbalancer], [monitoring]
 
 
-## Steps to setup monitoring
+## Steps to Setup Monitoring
 
-1. To setup monitoring enter the monitoring server ip:3000 to login into grafana. By default the username is admin.Setup the new password there if required.
+### Prerequisites
+- Ensure port 3000 is accessible on the monitoring server
+- Note down the Prometheus server URL (default: http://localhost:9090)
+- Note down the Loki server URL (default: http://localhost:3100)
 
-2. In the data sources section of grafana add prometheus and loki data sources.
+### Grafana Setup
+1. Access Grafana by navigating to `http://<monitoring-server-ip>:3000`
+2. Log in with the default credentials:
+   - Username: admin
+   - Password: admin
+   - You will be prompted to change the password on first login
 
-3. Go to the dashboard section and click on new on the top right side and then on import.
+### Configure Data Sources
+1. Navigate to Configuration > Data Sources
+2. Add Prometheus:
+   - Click "Add data source" and select "Prometheus"
+   - Set URL to your Prometheus server
+   - Click "Save & Test" to verify the connection
+3. Add Loki:
+   - Click "Add data source" and select "Loki"
+   - Set URL to your Loki server
+   - Click "Save & Test" to verify the connection
 
-4. Go to the dashboard directory and copy contents of any dashboard and then import that dashboard. Similarly repeat the process for other two and save those dashboards.
+### Import Dashboards
+1. Navigate to Dashboards > Import
+2. Import each dashboard from the `Dashboard` directory:
+   - Copy the contents of the dashboard JSON file
+   - Click "Import" and select the appropriate data source
+   - Repeat for all dashboard files
+   
+### Verification
+1. Verify that dashboards are showing data
+
+### Troubleshooting
+- If metrics are missing, verify Prometheus targets are up
+- If logs are missing, check Promtail configuration
+- For connection issues, verify network connectivity and firewall rules
 
 
 

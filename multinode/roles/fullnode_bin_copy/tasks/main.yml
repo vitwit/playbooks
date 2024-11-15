@@ -112,8 +112,8 @@
   template:
     src: "{{ playbook_dir }}/templates/node-service.j2"
     dest: "/etc/systemd/system/{{ network }}.service"
-    owner: root
-    group: root
+    owner: "{{ user }}"
+    group: "{{ user }}"
     mode: "0644"
   loop: "{{ range(0, fullnode_count) | list }}"
   when: "inventory_hostname == groups['fullnodes'][item]"

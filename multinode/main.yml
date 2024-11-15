@@ -44,12 +44,6 @@
   roles:
     - explorer_faucet_setup
 
-- name: Cleanup the playbook
-  hosts: localhost
-  roles:
-    - Cleanup_playbook
-
-
 - name: Grafana Setup
   hosts: monitoring
   vars:
@@ -62,4 +56,10 @@
   vars:
     ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
   roles: 
-    - monitoring_install 
+    - monitoring_install
+
+- name: Cleanup the playbook
+  hosts: localhost
+  roles:
+    - Cleanup_playbook
+    

@@ -1,5 +1,4 @@
 
-## TO BE RUN ON HOSTS FULLNODES AND VALIDATORS
 ---
 - name: Install node exporter
   get_url:
@@ -34,9 +33,11 @@
     group: "{{ ansible_user }}"
     mode: "0644"
 
-- name: Change node_exporter permissions
+- name: Set node_exporter permission
   become: true
-  shell: chmod +x /usr/local/bin/node_exporter    
+  file:
+    path: /usr/local/bin/node_exporter
+    mode: '0755'  
 
 - name: Start the service file
   become: true
@@ -106,9 +107,11 @@
     node_name: "validator{{ item }}"  
   when: "inventory_hostname == groups['validators'][item]"   
 
-- name: Change node_exporter permissions
+- name: Set promtail permissions
   become: true
-  shell: chmod +x /usr/local/bin/promtail    
+  file:
+    path: /usr/local/bin/promtail
+    mode: '0755'    
 
 - name: Start the promtail service
   become: true
@@ -132,18 +135,3 @@
     path: "{{ user_home }}/promtail-linux-amd64.zip"
     state: absent
   become: true    
-
-
-
-
-
-
-
-
-
-
-    
-
-
-
-  

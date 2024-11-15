@@ -87,8 +87,8 @@
   template:
     src: "{{ playbook_dir }}/templates/node-service.j2"
     dest: "/etc/systemd/system/{{ network }}.service"
-    owner: root
-    group: root
+    owner: "{{ user }}"
+    group: "{{ user }}"
     mode: "0644"
 
 - name: Replace prometheus value in config.toml
@@ -103,7 +103,7 @@
   replace:
     path: "{{ node_home }}/config/config.toml"
     regexp: 'namespace = "cometbft"'
-    replace: 'namespace = "tendermint"'    
+    replace: 'namespace = "tendermint"'
    
 - name: Start the service file
   become: true

@@ -48,7 +48,7 @@
     api_token: "{{ digital_ocean_api_token }}"
   with_sequence: start=0 end={{ fullnode_count-1 }}
   register: do1
-####################################################################
+
 - name: Create monitoring node  Droplet
   digital_ocean_droplet:
     state: present
@@ -69,27 +69,18 @@
           ssh-authorized-keys:
             - {{ ssh_key_variable  }}
     api_token: "{{ digital_ocean_api_token }}"
-  # with_sequence: start=0 end={{ fullnode_count-1 }}
   register: do3
 
 - name: Extract IP address and ID
   set_fact:
-    # droplet_id: "{{ do3.data.droplet.id }}"
     monitor_ip: "{{ do3.data.droplet.networks.v4[0].ip_address }}"  
   
-# - name: Extract IP addresses
-#   set_fact:
-#     droplet_ids: "{{ do3.results | json_query('[].data.droplet.id') | flatten }}"
-#     monitor_ip: "{{ do3.results | json_query('[].data.droplet.networks.v4[0].ip_address') | flatten }}"
-
 - name: Append IP address to .inventory file under [monitoring]
   lineinfile:
     path: "inventory.ini"
     insertafter: "^\\[monitoring\\]"
     line: "monitor ansible_host={{ monitor_ip }} ansible_user={{ user }}"
 
-
-#####################################################################
 - name: Extract IP addresses
   set_fact:
     droplet_ids: "{{ do1.results | json_query('[].data.droplet.id') | flatten }}"
@@ -173,6 +164,7 @@
 - name: Add monitor to inventory
   add_host:
     name: "monitor"
-    ansible_host: "{{ monitor_ip }}" 
-    ansible_user: "root"
+    ansible_host: "{{ monitor_ip }}"
+    ansible_user: "{{ user }}"
     groups: monitoring
+    

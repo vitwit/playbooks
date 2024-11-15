@@ -49,6 +49,11 @@
         src: "{{ user_home }}/prometheus-2.53.2.linux-amd64.tar.gz"
         dest: "{{ user_home }}"
 
+    - name: Cleanup downloaded artifacts
+      file:
+        path: "{{ user_home }}/prometheus-2.53.2.linux-amd64.tar.gz"
+        state: absent    
+
     - name: Create Prometheus directories with correct ownership and permissions
       become: true
       file:
@@ -56,7 +61,7 @@
         state: directory
         owner: "{{ user }}"
         group: "{{ user }}"
-        mode: '0755'
+        mode: '0750'
       loop:
         - /etc/prometheus
         - /var/lib/prometheus
@@ -78,7 +83,7 @@
         path: "{{ item }}"
         owner: "{{ user }}"
         group: "{{ user }}"
-        mode: '0755'
+        mode: "{{ item | regex_search('bin') | ternary('0755', '0640') }}"
       loop:
         - /usr/local/bin/prometheus
         - /usr/local/bin/promtool
@@ -115,10 +120,6 @@
         url: https://github.com/grafana/loki/releases/download/v3.2.0/loki-linux-amd64.zip
         dest: "{{ user_home }}/loki-linux-amd64.zip"
 
-    - name: sleep for a few seconds
-      pause:
-        seconds: 30    
-
     - name: Install unzip
       become: true
       apt:
@@ -143,8 +144,8 @@
       file:
         path: /etc/loki
         state: directory
-        owner: root
-        group: root
+        owner: "{{ user }}"
+        group: "{{ user }}"
         mode: '0755'
 
     - name: Copy the Loki config file
@@ -152,8 +153,8 @@
       template:
         src: "{{ playbook_dir }}/templates/loki-config.j2"
         dest: "/etc/loki/loki-config.yaml"
-        owner: root
-        group: root
+        owner: "{{ user }}"
+        group: "{{ user }}"
         mode: "0644"
 
     - name: Copy the Loki service file
@@ -161,13 +162,15 @@
       template:
         src: "{{ playbook_dir }}/templates/loki-service.j2"
         dest: "/etc/systemd/system/loki.service"
-        owner: root
-        group: root
+        owner: "{{ user }}"
+        group: "{{ user }}"
         mode: "0644"
 
     - name: Change Loki permissions
       become: true
-      shell: chmod a+x /usr/local/bin/loki    
+      file:
+        path: /usr/local/bin/loki
+        mode: '0755'
 
     - name: Reload systemd daemon
       become: true
@@ -183,4 +186,6 @@
 
     - name: Restart the journald service file
       become: true
-      shell: systemctl restart systemd-journald.service    
+      systemd:
+        name: systemd-journald
+        state: restarted
