@@ -52,7 +52,7 @@
     - name: Cleanup downloaded artifacts
       file:
         path: "{{ user_home }}/prometheus-2.53.2.linux-amd64.tar.gz"
-        state: absent    
+        state: absent
 
     - name: Create Prometheus directories with correct ownership and permissions
       become: true

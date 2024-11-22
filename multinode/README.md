@@ -40,12 +40,12 @@ After the nodes are operational, an explorer and a faucet are set up for the mul
 6. Grafana Monitoring
 
 The monitoring setup includes:
-  - Prometheus for collecting metrics from nodes
-  - Loki for aggregating logs
-  - Node Exporter for system metrics
-  - Grafana dashboards for:
-  - Tendermint metrics (blockchain performance, consensus, etc.)
-  - System metrics (CPU, memory, disk usage)
+  * Prometheus for collecting metrics from nodes
+  * Loki for aggregating logs
+  * Node Exporter for system metrics
+  * Grafana dashboards for:
+    - Tendermint metrics (blockchain performance, consensus, etc.)
+    - System metrics (CPU, memory, disk usage)
   - For setup instructions, see the [Steps to setup monitoring](#steps-to-setup-monitoring) section.
 
 # Steps to deploy the playbook
@@ -100,15 +100,18 @@ ansible-playbook main.yml  -i inventory.ini
 5. To view the explorer, enter the explorer-load balancer IP. For the faucet, enter explorer-load balancer IP:83.
 Initially, refresh the faucet page (Ctrl + Shift + R) until the Faucet Address and balance fields are visible.
 ## NOTE: To rerun the playbook, remove the fields in the inventory generated under: 
-### [validators] ,[fullnodes], [loadbalancer], [monitoring]
+* [validators]
+* [fullnodes]
+* [loadbalancer]
+* [monitoring]
 
 
 ## Steps to Setup Monitoring
 
 ### Prerequisites
 - Ensure port 3000 is accessible on the monitoring server
-- Note down the Prometheus server URL (default: http://localhost:9090)
-- Note down the Loki server URL (default: http://localhost:3100)
+- Note down the Prometheus server URL (default: `http://localhost:9090`)
+- Note down the Loki server URL (default: `http://localhost:3100`)
 
 ### Grafana Setup
 1. Access Grafana by navigating to `http://<monitoring-server-ip>:3000`

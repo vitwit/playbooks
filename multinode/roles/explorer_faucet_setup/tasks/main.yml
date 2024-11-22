@@ -61,6 +61,10 @@
     dest: "{{ user_home }}/explorer"
     version: "f0120a4a9f1a96f596139f36a9030fd05f227d8b"
 
+- name: sleep for a few seconds
+  pause:
+    seconds: 30
+
 - name: Install nginx
   become: true
   apt:

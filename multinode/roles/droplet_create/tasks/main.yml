@@ -73,7 +73,7 @@
 
 - name: Extract IP address and ID
   set_fact:
-    monitor_ip: "{{ do3.data.droplet.networks.v4[0].ip_address }}"  
+    monitor_ip: "{{ do3.data.droplet.networks.v4[0].ip_address }}"
   
 - name: Append IP address to .inventory file under [monitoring]
   lineinfile:
@@ -167,4 +167,3 @@
     ansible_host: "{{ monitor_ip }}"
     ansible_user: "{{ user }}"
     groups: monitoring
-    

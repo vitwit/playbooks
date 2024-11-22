@@ -18,12 +18,6 @@
     dest: /usr/local/bin/node_exporter
     remote_src: yes 
 
-- name: Remove the tar files from the  folder
-  become: true
-  file:
-    path: "{{ user_home  }}/node_exporter-1.8.2.linux-amd64.tar.gz"
-    state: absent
-
 - name: Copy the node_exporter service file
   become: true
   template: 
@@ -50,6 +44,8 @@
   apt: 
     name: unzip
     state: present
+    update_cache: yes
+    cache_valid_time: 3600
   become: true
 
 - name: Install promtail 
@@ -124,14 +120,14 @@
   become: true
   shell: systemctl restart systemd-journald.service  
 
-- name: Delete promtail-linux-amd64 file on the home directory
+- name: Cleanup temporary files
   file:
-    path: "{{ user_home }}/promtail-linux-amd64"
+    path: "{{ item }}"
     state: absent
-  become: true  
+  become: true
+  with_items:
+    - "{{ user_home }}/promtail-linux-amd64"
+    - "{{ user_home }}/promtail-linux-amd64.zip"
+    - "{{ user_home }}/node_exporter-1.8.2.linux-amd64"
+    - "{{ user_home  }}/node_exporter-1.8.2.linux-amd64.tar.gz"
 
-- name: Delete promtail-linux-amd64 zip  file on the home directory
-  file:
-    path: "{{ user_home }}/promtail-linux-amd64.zip"
-    state: absent
-  become: true    
