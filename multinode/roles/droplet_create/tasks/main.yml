@@ -30,7 +30,7 @@
   digital_ocean_droplet:
     state: present
     name: "fullnode{{ item }}"
-    size: s-2vcpu-4gb
+    size: "{{ size }}"
     image: ubuntu-22-04-x64
     region: "{{ region }}"
     ssh_keys: "{{ ssh_key_id }}"
@@ -53,7 +53,7 @@
   digital_ocean_droplet:
     state: present
     name: "monitor"
-    size: s-2vcpu-4gb
+    size: "{{ size }}"
     image: ubuntu-22-04-x64
     region: "{{ region }}"
     ssh_keys: "{{ ssh_key_id }}"
@@ -100,7 +100,7 @@
   digital_ocean_droplet:
     state: present
     name: "validator{{ item }}"
-    size: s-2vcpu-4gb
+    size: "{{ size }}"
     image: ubuntu-22-04-x64
     region: "{{ region }}"
     ssh_keys: "{{ ssh_key_id }}"
