@@ -30,7 +30,7 @@
   digital_ocean_droplet:
     state: present
     name: "node{{ item }}"
-    size: s-2vcpu-4gb
+    size: "{{ size }}"
     image: ubuntu-22-04-x64
     region: "{{ region }}"
     ssh_keys: "{{ ssh_key_id }}"
