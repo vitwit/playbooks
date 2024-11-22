@@ -49,7 +49,7 @@
   with_sequence: start=0 end={{ fullnode_count-1 }}
   register: do1
 
-- name: Create monitoring node  Droplet
+- name: Create monitoring node Droplet
   digital_ocean_droplet:
     state: present
     name: "monitor"
@@ -74,7 +74,7 @@
 - name: Extract IP address and ID
   set_fact:
     monitor_ip: "{{ do3.data.droplet.networks.v4[0].ip_address }}"
-  
+
 - name: Append IP address to .inventory file under [monitoring]
   lineinfile:
     path: "inventory.ini"
@@ -159,7 +159,6 @@
   loop: "{{ ip_addresses1 | zip(range(validators_count)) | list }}"
   loop_control:
     label: "{{ item[0] }}"
-
 
 - name: Add monitor to inventory
   add_host:
