@@ -1,0 +1,127 @@
+- name: Change ports for fullnode
+  block:
+    - name: Change P2P port for fullnode
+      ansible.builtin.replace:
+        path: "{{ user_home }}/{{ node_home }}_fullnode/config/config.toml"
+        regexp: '^laddr = "tcp://0.0.0.0:26656"'
+        replace: 'laddr = "tcp://0.0.0.0:26666"'
+
+    - name: Change RPC port for fullnode
+      ansible.builtin.replace:
+        path: "{{ user_home }}/{{ node_home }}_fullnode/config/config.toml"
+        regexp: '^laddr = "tcp://127.0.0.1:26657"'
+        replace: 'laddr = "tcp://0.0.0.0:26667"'
+
+    - name: Change REST API port for fullnode
+      when: sdk_version_clean is version('0.50.0', '<')
+      ansible.builtin.replace:
+        path: "{{ user_home }}/{{ node_home }}_fullnode/config/app.toml"
+        regexp: '^address = "tcp://0.0.0.0:1317"'
+        replace: 'address = "tcp://0.0.0.0:1318"'
+
+    - name: Change REST API port for fullnode
+      when: sdk_version_clean is version('0.50.0', '>=')
+      ansible.builtin.replace:
+        path: "{{ user_home }}/{{ node_home }}_fullnode/config/app.toml"
+        regexp: '^address = "tcp://localhost:1317"'
+        replace: 'address = "tcp://0.0.0.0:1318"'
+
+    - name: Change gRPC port for fullnode
+      when: sdk_version_clean is version('0.50.0', '<')
+      ansible.builtin.replace:
+        path: "{{ user_home }}/{{ node_home }}_fullnode/config/app.toml"
+        regexp: '^address = "0.0.0.0:9090"'
+        replace: 'address = "0.0.0.0:9093"'
+
+    - name: Change gRPC port for fullnode
+      when: sdk_version_clean is version('0.50.0', '>=')
+      ansible.builtin.replace:
+        path: "{{ user_home }}/{{ node_home }}_fullnode/config/app.toml"
+        regexp: '^address = "localhost:9090"'
+        replace: 'address = "0.0.0.0:9093"'
+
+    - name: Change gRPC-web port for fullnode
+      ansible.builtin.replace:
+        path: "{{ user_home }}/{{ node_home }}_fullnode/config/app.toml"
+        regexp: '^address = "0.0.0.0:9091"'
+        replace: 'address = "0.0.0.0:9094"'
+
+    - name: Making the change in the CORS section of config.toml
+      become: true
+      lineinfile:
+        path: "{{ user_home }}/{{ node_home }}_fullnode/config/config.toml"
+        regexp: 'cors_allowed_origins = \[\]'
+        line: 'cors_allowed_origins = ["*"]'
+
+    - name: Making the change in the CORS section of app.toml
+      become: true
+      lineinfile:
+        path: "{{ user_home }}/{{ node_home }}_fullnode/config/app.toml"
+        regexp: "enabled-unsafe-cors = false"
+        line: "enabled-unsafe-cors = true"
+
+    - name: set enable to true under api section
+      become: true
+      replace:
+        path: "{{ user_home }}/{{ node_home }}_fullnode/config/app.toml"
+        regexp: '(?ms)(\[api\][^\[]*enable\s*=\s*)false'
+        replace: '\1true'
+
+- name: Changes to validator config files
+  block:
+    - name: Make RPC accessible
+      ansible.builtin.replace:
+        path: "{{ user_home }}/{{ node_home }}/config/config.toml"
+        regexp: '^laddr = "tcp://127.0.0.1:26657"'
+        replace: 'laddr = "tcp://0.0.0.0:26657"'
+
+    - name: Making the change in the CORS section of config.toml
+      become: true
+      lineinfile:
+        path: "{{ user_home }}/{{ node_home }}/config/config.toml"
+        regexp: 'cors_allowed_origins = \[\]'
+        line: 'cors_allowed_origins = ["*"]'
+
+    - name: Making the change in the CORS section of app.toml
+      become: true
+      lineinfile:
+        path: "{{ user_home }}/{{ node_home }}/config/app.toml"
+        regexp: "enabled-unsafe-cors = false"
+        line: "enabled-unsafe-cors = true"
+
+    - name: set enable to true under api section
+      become: true
+      replace:
+        path: "{{ user_home }}/{{ node_home }}/config/app.toml"
+        regexp: '(?ms)(\[api\][^\[]*enable\s*=\s*)false'
+        replace: '\1true'
+
+    - name: Change REST API port for validator
+      when: sdk_version_clean is version('0.50.0', '>=')
+      ansible.builtin.replace:
+        path: "{{ user_home }}/{{ node_home }}/config/app.toml"
+        regexp: '^address = "tcp://localhost:1317"'
+        replace: 'address = "tcp://0.0.0.0:1317"'
+
+    - name: Change gRPC port for validator
+      when: sdk_version_clean is version('0.50.0', '>=')
+      ansible.builtin.replace:
+        path: "{{ user_home }}/{{ node_home }}/config/app.toml"
+        regexp: '^address = "localhost:9090"'
+        replace: 'address = "0.0.0.0:9090"'
+
+- name: Set minimum gas price
+  block:
+    - name: Set minimum gas price for validator
+      become: true
+      lineinfile:
+        path: "{{ user_home }}/{{ node_home }}/config/app.toml"
+        regexp: '^minimum-gas-prices\s*='
+        line: 'minimum-gas-prices = "{{ minimum_gas_price }}"'
+
+    - name: Set minimum gas price for fullnode
+      become: true
+      lineinfile:
+        path: "{{ user_home }}/{{ node_home }}_fullnode/config/app.toml"
+        regexp: '^minimum-gas-prices\s*='
+        line: 'minimum-gas-prices = "{{ minimum_gas_price }}"'

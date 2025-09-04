@@ -1,0 +1,46 @@
+---
+- name: Installations
+  hosts: IP
+  roles:
+    - installations
+
+- name: Validator setup
+  hosts: IP
+  gather_facts: yes
+  roles:
+    - validator-setup
+
+- name: Cosmos Genesis Tinkerer Setup
+  hosts: IP
+  roles:
+    - cosmos-genesis-tinkerer-setup
+
+- name: Node config changes
+  hosts: IP
+  gather_facts: yes
+  roles:
+    - node_config_changes
+
+- name: Cosmosvisor setup
+  hosts: IP
+  gather_facts: yes
+  roles:
+    - cosmovisor-setup
+
+- name: Explorer setup
+  hosts: IP
+  gather_facts: yes
+  roles:
+    - explorer_setup
+
+- name: Faucet setup
+  hosts: IP
+  gather_facts: yes
+  roles:
+    - faucet_setup
+
+- name: Proposal submission
+  hosts: IP
+  gather_facts: yes
+  roles:
+    - proposal_submission

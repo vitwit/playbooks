@@ -1,0 +1,73 @@
+- name: Install the faucet
+  become: true
+  git:
+    repo: "https://github.com/vitwit/ping-faucet.git"
+    dest: "{{ user_home }}/faucet"
+    version: "multi-chains"
+    force: yes
+
+- name: Remove existing config.js file
+  become: true
+  file:
+    path: "{{ user_home }}/faucet/config.js"
+    state: absent
+
+- name: Copy the config.js file
+  become: true
+  template:
+    src: "{{ playbook_dir }}/templates/faucet-config.j2"
+    dest: "{{ user_home }}/faucet/config.js"
+
+- name: Install express using npm
+  become: true
+  shell: >
+    . "{{ user_home }}/.nvm/nvm.sh" &&
+    export PATH="{{ user_home }}/.nvm/versions/node/v18.19.0/bin:$PATH" &&
+    npm install express
+  args:
+    chdir: "{{ user_home }}/faucet"
+
+- name: Run yarn
+  become: true
+  shell: >
+    . "{{ user_home }}/.nvm/nvm.sh" &&
+    export PATH="{{ user_home }}/.nvm/versions/node/v18.19.0/bin:$PATH" &&
+    yarn
+  args:
+    chdir: "{{ user_home }}/faucet"
+
+- name: Copy the service file
+  become: true
+  template:
+    src: "{{ playbook_dir }}/templates/faucet-service.j2"
+    dest: "/etc/systemd/system/faucet.service"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Create faucet data directory
+  file:
+    path: "{{ user_home }}/faucet/.faucet"
+    state: directory
+    owner: "{{ ansible_user }}"
+    mode: "0755"
+
+- name: Save faucet mnemonic to file
+  copy:
+    dest: "{{ user_home }}/faucet/.faucet/mnemonic.txt"
+    content: "{{ faucet_key.mnemonic }}\n"
+    owner: "{{ ansible_user }}"
+    mode: "0600"
+
+- name: Update config.js with faucet mnemonic
+  lineinfile:
+    path: "{{ user_home }}/faucet/config.js"
+    regexp: '^\s*mnemonic:\s*"([^"]*)"'
+    line: 'mnemonic: "{{ faucet_key.mnemonic }}",'
+
+- name: Start the faucet service
+  become: true
+  systemd:
+    name: faucet
+    state: started
+    enabled: yes
