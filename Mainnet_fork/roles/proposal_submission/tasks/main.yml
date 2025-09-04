@@ -1,0 +1,170 @@
+- name: Normalize sdk version
+  set_fact:
+    sdk_version_short: "{{ sdk_version | regex_replace('^v', '') | regex_replace('\\.\\d+$', '') }}"
+  # Example: v0.45.16 → 0.45
+- name: Debug node version short
+  debug:
+    msg: "Node version short is {{ sdk_version_short }}"
+
+- name: Query gov module account address
+  command: "{{ daemon }} q auth module-account gov --output json"
+  register: gov_account
+  environment:
+    PATH: "{{ path }}"
+  when: sdk_version_short is version('0.50', '>=')
+
+- name: Set gov module address fact
+  set_fact:
+    gov_address: "{{ (gov_account.stdout | from_json).account.value.address }}"
+  when: sdk_version_short is version('0.50', '>=')
+
+- name: Debug gov module address
+  debug:
+    msg: "Gov module address is {{ gov_address }}"
+  when: sdk_version_short is version('0.50', '>=')
+
+# ----------------- 0.45 -----------------
+- name: Submit upgrade proposal for 0.45
+  shell: |
+    {{ daemon }} tx gov submit-proposal software-upgrade "{{ network_upgrade_name }}" \
+      --title "Upgrade to {{ network_upgrade_version }}" \
+      --description "Upgrade chain binary to {{ network_upgrade_version }}" \
+      --upgrade-height {{ upgrade_height }} \
+      --from {{ validator_name }} \
+      --keyring-backend test \
+      --deposit {{ upgrade_deposit }}{{ denom }} \
+      --chain-id local-testnet \
+      --fees 35000000{{ denom }} \
+      --home {{ user_home }}/{{ node_home }} -y \
+      --broadcast-mode block \
+      --gas auto --gas-adjustment 1.5 \
+      --output json
+  when: sdk_version_short == '0.45'
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ path }}"
+  register: proposal_tx
+
+# ----------------- 0.46 / 0.47 -----------------
+- name: Submit upgrade proposal for 0.46 / 0.47
+  shell: |
+    {{ daemon }} tx gov submit-legacy-proposal software-upgrade "{{ network_upgrade_name }}" \
+      --title "Upgrade to {{ network_upgrade_version }}" \
+      --description "Upgrade chain binary to {{ network_upgrade_version }}" \
+      --upgrade-height {{ upgrade_height }} \
+      --upgrade-info "testing" \
+      --from {{ validator_name }} \
+      --keyring-backend test \
+      --deposit {{ upgrade_deposit }}{{ denom }} \
+      --fees 35000000{{ denom }} \
+      --chain-id local-testnet \
+      --no-validate \
+      --home {{ user_home }}/{{ node_home }} -y \
+      --broadcast-mode block \
+      --gas auto --gas-adjustment 1.5 \
+      --output json
+  when: sdk_version_short in ['0.46', '0.47']
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ path }}"
+  register: proposal_tx
+#-------------------------------------------0.50-----------------------------------------------------
+- name: Write upgrade proposal JSON (0.50+)
+  copy:
+    dest: "{{ user_home }}/upgrade.json"
+    content: |
+      {
+        "messages": [
+          {
+            "@type": "/cosmos.upgrade.v1beta1.MsgSoftwareUpgrade",
+            "authority": "{{ gov_address }}",
+            "plan": {
+              "name": "{{ network_upgrade_name }}",
+              "height": "{{ upgrade_height }}",
+              "info": "",
+              "upgraded_client_state": null
+            }
+          }
+        ],
+        "deposit": "{{ upgrade_deposit }}{{ denom }}",
+        "title": "{{ network_upgrade_version }}",
+        "summary": "Upgrade chain binary to {{ network_upgrade_version }}",
+        "expedited": false
+      }
+  when: sdk_version_short is version('0.50', '>=')
+- name: Submit software upgrade proposal (0.50+)
+  shell: |
+    {{ daemon }} tx gov submit-proposal "{{ user_home }}/upgrade.json" \
+      --from {{ validator_name }} \
+      --keyring-backend test \
+      --chain-id local-testnet \
+      --fees 35000000{{ denom }} \
+      --gas auto \
+      --gas-adjustment 1.5 \
+      --home {{ user_home }}/{{ node_home }} \
+      -y --output json
+  when: sdk_version_short is version('0.50', '>=')
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ path }}"
+  register: proposal_tx
+
+- name: Debug proposal submission output
+  debug:
+    var: proposal_tx
+
+- name: Pause for 10 seconds before querying proposal
+  pause:
+    seconds: 15
+
+- name: Get latest proposal ID
+  command: "{{ daemon }} q gov proposals --output json"
+  register: proposals_json
+  environment:
+    PATH: "{{ path }}"
+
+- name: Parse latest proposal ID
+  set_fact:
+    proposal_id: >-
+      {{ (proposals_json.stdout | from_json).proposals | map(attribute='proposal_id') | map('int') | max }}
+  when: sdk_version_short in ['0.45']
+
+- name: Parse latest proposal ID (0.46/0.47)
+  set_fact:
+    proposal_id: >-
+      {{ (proposals_json.stdout | from_json).proposals
+         | map(attribute='id') | map('int') | max }}
+  when: sdk_version_short in ['0.46', '0.47']
+
+- name: Parse latest proposal ID (>=0.50)
+  set_fact:
+    proposal_id: >-
+      {{ (proposals_json.stdout | from_json).proposals
+         | map(attribute='id') | map('int') | max }}
+  when: sdk_version_short is version('0.50', '>=')
+
+- name: Show captured proposal ID
+  debug:
+    msg: "Proposal ID is {{ proposal_id }}"
+
+- name: Vote on the proposal
+  shell: |
+    {{ daemon }} tx gov vote {{ proposal_id }} yes \
+      --from {{ validator_name }} \
+      --chain-id local-testnet \
+      --gas-prices 5000{{ denom }} \
+      --keyring-backend test \
+      --gas auto --gas-adjustment 1.5 \
+      --home {{ user_home }}/{{ node_home }} -y
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ path }}"
+  register: vote_account
+
+- name: Debug vote output
+  debug:
+    var: vote_account

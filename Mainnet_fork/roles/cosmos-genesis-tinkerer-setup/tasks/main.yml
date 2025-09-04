@@ -1,0 +1,241 @@
+---
+- name: Normalize sdk version (strip leading v)
+  set_fact:
+    sdk_version_clean: "{{ sdk_version | regex_replace('^v', '') }}"
+
+- name: Debug node version clean
+  debug:
+    msg: "Node version clean is {{ sdk_version_clean }}"
+
+- name: Clone the git repo
+  git:
+    repo: "https://github.com/hyphacoop/cosmos-genesis-tinkerer.git"
+    dest: "{{ user_home }}/cosmos-genesis-tinkerer"
+    version: "main"
+
+- name: Move the state export file inside the cosmos-genesis-tinkerer repo
+  copy:
+    src: "{{ state_export_file_path }}"
+    dest: "{{ user_home }}/cosmos-genesis-tinkerer/state_export.json"
+    remote_src: yes
+  when: state_export_file_path !=""
+
+- name: Copy the example_mainnet_genesis.py file
+  copy:
+    src: "{{ user_home }}/cosmos-genesis-tinkerer/example_mainnet_genesis.py"
+    dest: "{{ user_home }}/cosmos-genesis-tinkerer/{{ network }}.py"
+    remote_src: yes
+    mode: "0755"
+
+- name: Changes in the {{ network }}.py
+  block:
+    - name: Replace the GENESIS_ARCHIVE filename
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/{{ network }}.py"
+        regexp: 'GENESIS_ARCHIVE\s*=\s*".*"'
+        replace: 'GENESIS_ARCHIVE = "state_export.json"'
+
+    - name: Replace the self_delegation_address
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/{{ network }}.py"
+        regexp: 'cb_val\.self_delegation_address\s*=\s*".*"'
+        replace: 'cb_val.self_delegation_address = "{{ top_self_delegation_address }}"'
+
+    - name: Replace the self_delegation_reward_address
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/{{ network }}.py"
+        regexp: 'cb_val\.self_delegation_reward_address\s*=\s*".*"'
+        replace: 'cb_val.self_delegation_reward_address = "{{ top_self_delegation_address }}"'
+
+    - name: Replace the self_delegation_public_key
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/{{ network }}.py"
+        regexp: 'cb_val\.self_delegation_public_key\s*=\s*".*"'
+        replace: 'cb_val.self_delegation_public_key = "{{ top_self_delegation_public_key }}"'
+
+    - name: Replace the operator_address
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/{{ network }}.py"
+        regexp: 'cb_val\.operator_address\s*=\s*".*"'
+        replace: 'cb_val.operator_address = "{{ top_operator_address }}"'
+
+    - name: Replace the public_key
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/{{ network }}.py"
+        regexp: 'cb_val\.public_key\s*=\s*".*"'
+        replace: 'cb_val.public_key = "{{ top_operator_pubkey }}"'
+
+    - name: Replace the hex address
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/{{ network }}.py"
+        regexp: 'cb_val\.address\s*=\s*".*"'
+        replace: 'cb_val.address = "{{ top_hexaddr }}"'
+
+    - name: Replace the consensus_address
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/{{ network }}.py"
+        regexp: 'cb_val\.consensus_address\s*=\s*".*"'
+        replace: 'cb_val.consensus_address = "{{ top_consensus_address }}"'
+
+    - name: Replace the test delegation address
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/{{ network }}.py"
+        regexp: 'test_val\.self_delegation_address\s*=\s*".*"'
+        replace: 'test_val.self_delegation_address = "{{ self_delegation_address[0] }}"'
+
+    - name: Replace the test delegation reward address
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/{{ network }}.py"
+        regexp: 'test_val\.self_delegation_reward_address\s*=\s*".*"'
+        replace: 'test_val.self_delegation_reward_address = "{{ self_delegation_address[0] }}"'
+
+    - name: Replace the test delegation public key
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/{{ network }}.py"
+        regexp: 'test_val\.self_delegation_public_key\s*=\s*".*"'
+        replace: 'test_val.self_delegation_public_key = "{{ self_delegation_pubkey[0] }}"'
+
+    - name: Replace the test operator address
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/{{ network }}.py"
+        regexp: 'test_val\.operator_address\s*=\s*".*"'
+        replace: 'test_val.operator_address = "{{ operator_address[0] }}"'
+
+    - name: Replace the test public key
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/{{ network }}.py"
+        regexp: 'test_val\.public_key\s*=\s*".*"'
+        replace: 'test_val.public_key = "{{ operator_pubkey }}"'
+
+    - name: Replace the test hex address
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/{{ network }}.py"
+        regexp: 'test_val\.address\s*=\s*".*"'
+        replace: 'test_val.address = "{{ hex_address }}"'
+
+    - name: Replace the test consensus address
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/{{ network }}.py"
+        regexp: 'test_val\.consensus_address\s*=\s*".*"'
+        replace: 'test_val.consensus_address = "{{ consensus_address }}"'
+
+    - name: Replace the test delegation address
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/{{ network }}.py"
+        regexp: 'test_del\.address\s*=\s*".*"'
+        replace: 'test_del.address = "{{ self_delegation_address[0] }}"'
+
+    - name: Replace the test delegation public key
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/{{ network }}.py"
+        regexp: 'test_del\.public_key\s*=\s*".*"'
+        replace: 'test_del.public_key = "{{ self_delegation_pubkey[0] }}"'
+
+    - name: Increase  the UATOM_STAKE_INCREASE
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/{{ network }}.py"
+        regexp: 'UATOM_STAKE_INCREASE\s*=\s*.*$'
+        replace: "UATOM_STAKE_INCREASE = 5500000000000 * 1000000"
+
+    - name: Increase the UATOM_LIQUID_TOKEN_INCREASE
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/{{ network }}.py"
+        regexp: 'UATOM_LIQUID_TOKEN_INCREASE\s*=\s*.*$'
+        replace: "UATOM_LIQUID_TOKEN_INCREASE = 1750000000000 * 1000000"
+
+#########################################################################
+
+- name: Apply code changes to cosmos_genesis_tinker.py
+  when: sdk_version_clean is version('0.50.0', '<')
+  block:
+    - name: Replace `consensus` validators with top-level validators
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/cosmos_genesis_tinker.py"
+        regexp: 'return\s+self\.genesis\["consensus"\]\["validators"\]'
+        replace: 'return self.genesis["validators"]'
+
+    - name: Update set_min_deposit to use deposit_params
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/cosmos_genesis_tinker.py"
+        regexp: '(?s)(def set_min_deposit\(.*?\).*?\n(?:.*?\n)*?\s*)params\s*=\s*self\.gov\["params"\]'
+        replace: '\1params = self.gov["deposit_params"]'
+
+    - name: Update setTallyParam function to use tally_params
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/cosmos_genesis_tinker.py"
+        regexp: 'self\.gov\["params"\]\[parameter_name\]\s*=\s*value'
+        replace: 'self.gov["tally_params"][parameter_name] = value'
+
+    - name: Update voting period function to use voting_params
+      ansible.builtin.replace:
+        path: "{{ user_home }}/cosmos-genesis-tinkerer/cosmos_genesis_tinker.py"
+        regexp: 'self\.gov\["params"\]\["voting_period"\]\s*=\s*voting_period'
+        replace: 'self.gov["voting_params"]["voting_period"] = voting_period'
+
+- name: Replace all "uatom" with value of denom variable in the tinker file
+  ansible.builtin.replace:
+    path: "{{ user_home }}/cosmos-genesis-tinkerer/cosmos_genesis_tinker.py"
+    regexp: "uatom"
+    replace: "{{ denom }}"
+
+- name: Replace 'uatom' with denom in network.py file
+  ansible.builtin.replace:
+    path: "{{ user_home }}/cosmos-genesis-tinkerer/{{ network }}.py"
+    regexp: "'uatom'"
+    replace: "'{{ denom }}'"
+
+- name: Run the python application
+  block:
+    - name: Create Python virtual environment
+      command: python3 -m venv .env
+      args:
+        chdir: "{{ user_home }}/cosmos-genesis-tinkerer"
+
+    - name: Install pip requirements inside venv
+      command: "{{ user_home }}/cosmos-genesis-tinkerer/.env/bin/pip install -r requirements.txt"
+      args:
+        chdir: "{{ user_home }}/cosmos-genesis-tinkerer"
+
+    - name: Run {{ network }}.py with python3
+      command: "python3 {{ network }}.py"
+      args:
+        chdir: "{{ user_home }}/cosmos-genesis-tinkerer"
+
+- name: Copy the generated genesis file to validator and fullnode directories
+  block:
+    - name: Copy the genesis file to validator directory
+      copy:
+        src: "{{ user_home }}/cosmos-genesis-tinkerer/tinkered_genesis.json"
+        dest: "{{ user_home }}/{{ node_home }}/config/genesis.json"
+        remote_src: yes
+
+    - name: Add faucet key
+      become: true
+      command: "{{ daemon }} keys add faucet --output json"
+      environment:
+        PATH: "{{ path }}"
+      register: faucet_key_json
+
+    - name: Parse faucet key json
+      set_fact:
+        faucet_key: "{{ faucet_key_json.stdout | from_json }}"
+
+    - name: Add genesis account  for faucet
+      when: sdk_version_clean is version('0.50.0', '<')
+      become: true
+      command: "{{ daemon }} add-genesis-account faucet  100000000000{{ denom }}"
+      environment:
+        PATH: "{{ path }}"
+
+    - name: Add genesis account  for faucet
+      when: sdk_version_clean is version('0.50.0', '>=')
+      become: true
+      command: "{{ daemon }} genesis add-genesis-account faucet  100000000000{{ denom }}"
+      environment:
+        PATH: "{{ path }}"
+
+    - name: Copy the genesis file to fullnode directory
+      copy:
+        src: "{{ user_home }}/{{ node_home }}/config/genesis.json"
+        dest: "{{ user_home }}/{{ node_home }}_fullnode/config/genesis.json"
+        remote_src: yes
