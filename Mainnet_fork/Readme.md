@@ -1,7 +1,7 @@
 # Mainnet Fork setup
 
 ## Overview
-This ansible playbook automates the mainnet fork setup. Additionally, it also sets up an explorer and faucet.This playbook is primarily intended for testing purpose.
+This Ansible playbook automates the mainnet fork setup. Additionally, it sets up an explorer and a faucet. This playbook is primarily intended for testing purposes.
 
 ## Components
 1. Validator Node
@@ -19,10 +19,10 @@ This ansible playbook automates the mainnet fork setup. Additionally, it also se
 All necessary software installations are performed on the respective server, ensuring each node has the required dependencies and configurations.
 
 2. Validator Setup
-The blockchain network is setup consisting of a validator node and a fullnode
+The blockchain network is set up consisting of a validator node and a fullnode
 
 3. Cosmos Genesis Tinkerer
-The Cosmos Genesis Tinkerer scripts are run to imitate a test environment and creates a network genesis file.
+The Cosmos Genesis Tinkerer scripts simulate a test environment and create a network genesis file.
 
 4. Node Config changes
 Node configuration changes are done based on the user requirements.
@@ -46,6 +46,8 @@ An upgrade proposal is submitted to the blockchain network to perform an automat
 
 4. Run the playbook using the command :
 
-```ini
+```bash
 ansible-playbook main.yml  -i inventory.ini
 ```
+
+5. To view the explorer, enter the server IP. For the faucet, enter server IP:83.

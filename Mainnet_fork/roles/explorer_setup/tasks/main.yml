@@ -51,7 +51,6 @@
     PATH: "{{ user_home }}/.nvm/versions/node/v18.19.0/bin:{{ ansible_env.PATH }}"
 
 - name: Install ping_explorer
-  become: true
   git:
     repo: "{{ ping_repo }}"
     dest: "{{ user_home }}/explorer"

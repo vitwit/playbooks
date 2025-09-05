@@ -3,7 +3,7 @@
   set_fact:
     sdk_version_clean: "{{ sdk_version | regex_replace('^v', '') }}"
 
-- name: Debug node version clean
+- name: Debug sdk version clean
   debug:
     msg: "Node version clean is {{ sdk_version_clean }}"
 
@@ -12,6 +12,8 @@
     repo: "https://github.com/hyphacoop/cosmos-genesis-tinkerer.git"
     dest: "{{ user_home }}/cosmos-genesis-tinkerer"
     version: "main"
+    update: yes
+    force: yes
 
 - name: Move the state export file inside the cosmos-genesis-tinkerer repo
   copy:
@@ -220,14 +222,14 @@
       set_fact:
         faucet_key: "{{ faucet_key_json.stdout | from_json }}"
 
-    - name: Add genesis account  for faucet
+    - name: Add genesis account for faucet (<0.50)
       when: sdk_version_clean is version('0.50.0', '<')
       become: true
       command: "{{ daemon }} add-genesis-account faucet  100000000000{{ denom }}"
       environment:
         PATH: "{{ path }}"
 
-    - name: Add genesis account  for faucet
+    - name: Add genesis account for faucet (>=0.50)
       when: sdk_version_clean is version('0.50.0', '>=')
       become: true
       command: "{{ daemon }} genesis add-genesis-account faucet  100000000000{{ denom }}"
