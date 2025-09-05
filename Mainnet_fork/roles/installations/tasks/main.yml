@@ -69,6 +69,7 @@
   become: true
   block:
     - name: Clone the git repo
+      become_user: "{{ ansible_user }}"
       git:
         repo: "{{ repo }}"
         dest: "{{ user_home }}/{{ network }}"
@@ -77,6 +78,7 @@
         force: yes
 
     - name: Install node
+      become_user: "{{ ansible_user }}"
       command: "make install"
       args:
         chdir: "{{ user_home }}/{{ network }}"

@@ -116,7 +116,7 @@
   debug:
     var: proposal_tx
 
-- name: Pause for 10 seconds before querying proposal
+- name: Pause for 15 seconds before querying proposal
   pause:
     seconds: 15
 
