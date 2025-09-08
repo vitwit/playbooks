@@ -1,0 +1,130 @@
+- name: Debug ansible_user
+  debug:
+    msg: "Ansible user for this host is {{ ansible_user }}, home is {{ user_home }}"
+
+- name: Install cosmovisor
+  command: go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest
+  environment:
+    PATH: "{{ path }}"
+
+- name: Create cosmovisor directories for validator
+  file:
+    path: "{{ user_home }}/{{ node_home }}/cosmovisor/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - genesis/bin
+    - upgrades/{{ network_upgrade_name }}/bin
+
+- name: Copy the binary into the cosmovisor directory for validator
+  copy:
+    src: "{{ user_home }}/go/bin/{{ daemon }}"
+    dest: "{{ user_home }}/{{ node_home }}/cosmovisor/genesis/bin/{{ daemon }}"
+    mode: "0755"
+    remote_src: yes
+
+- name: Create cosmovisor directories for fullnode
+  file:
+    path: "{{ user_home }}/{{ node_home }}_fullnode/cosmovisor/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - genesis/bin
+    - upgrades/{{ network_upgrade_name }}/bin
+
+- name: Change ownership of validator cosmovisor directory
+  become: true
+  file:
+    path: "{{ user_home }}/{{ node_home }}/cosmovisor"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    recurse: yes
+
+- name: Change ownership of fullnode cosmovisor directory
+  become: true
+  file:
+    path: "{{ user_home }}/{{ node_home }}_fullnode/cosmovisor"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    recurse: yes
+
+- name: Copy the binary into the cosmovisor directory for fullnode
+  copy:
+    src: "{{ user_home }}/go/bin/{{ daemon }}"
+    dest: "{{ user_home }}/{{ node_home }}_fullnode/cosmovisor/genesis/bin/{{ daemon }}"
+    mode: "0755"
+    remote_src: yes
+
+- name: Ensure cosmovisor current symlink for validator
+  file:
+    src: "{{ user_home }}/{{ node_home }}/cosmovisor/genesis"
+    dest: "{{ user_home }}/{{ node_home }}/cosmovisor/current"
+    state: link
+
+- name: Ensure cosmovisor current symlink for fullnode
+  file:
+    src: "{{ user_home }}/{{ node_home }}_fullnode/cosmovisor/genesis"
+    dest: "{{ user_home }}/{{ node_home }}_fullnode/cosmovisor/current"
+    state: link
+
+- name: Deploy validator systemd service
+  become: true
+  template:
+    src: "{{ playbook_dir }}/templates/validator-service.j2"
+    dest: /etc/systemd/system/{{ daemon }}-validator.service
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+
+- name: Reload systemd and enable service
+  become: true
+  systemd:
+    name: "{{ daemon }}-validator"
+    enabled: true
+    daemon_reload: true
+    state: started
+
+- name: Deploy fullnode systemd service
+  become: true
+  template:
+    src: "{{ playbook_dir }}/templates/fullnode-service.j2"
+    dest: /etc/systemd/system/{{ daemon }}-fullnode.service
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+
+- name: Reload systemd and enable service
+  become: true
+  systemd:
+    name: "{{ daemon }}-fullnode"
+    enabled: true
+    daemon_reload: true
+    state: started
+
+- name: Checkout to network_upgrade_version
+  become: true
+  ansible.builtin.command: git checkout "{{ network_upgrade_version }}"
+  args:
+    chdir: "{{ user_home }}/{{ network }}"
+
+- name: Build the upgrade
+  become: true
+  ansible.builtin.command: make build
+  environment:
+    PATH: "{{ path }}"
+  args:
+    chdir: "{{ user_home }}/{{ network }}"
+
+- name: Copy the binary into the cosmovisor directory for validator upgrade
+  copy:
+    src: "{{ user_home }}/{{ network }}/build/{{ daemon }}"
+    dest: "{{ user_home }}/{{ node_home }}/cosmovisor/upgrades/{{ network_upgrade_name }}/bin/{{ daemon }}"
+    mode: "0755"
+    remote_src: yes
+
+- name: Copy the binary into the cosmovisor directory for fullnode upgrade
+  copy:
+    src: "{{ user_home }}/{{ network }}/build/{{ daemon }}"
+    dest: "{{ user_home }}/{{ node_home }}_fullnode/cosmovisor/upgrades/{{ network_upgrade_name }}/bin/{{ daemon }}"
+    mode: "0755"
+    remote_src: yes

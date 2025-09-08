@@ -1,0 +1,133 @@
+---
+- name: Initialize the node
+  become: true
+  command: "{{ daemon }} init {{ validator_name }} "
+  environment:
+    PATH: "{{ path }}"
+
+- name: Set keyring-backend to "test" in client.toml
+  become: true
+  ansible.builtin.replace:
+    path: "{{ user_home }}/{{ node_home }}/config/client.toml"
+    regexp: '^keyring-backend\s*=\s*".*"'
+    replace: 'keyring-backend = "test"'
+
+- name: Add validator key
+  become: true
+  command: "{{ daemon }} keys add {{ validator_name }}"
+  register: add_validator_key_output
+  environment:
+    PATH: "{{ path }}"
+
+- name: Extract self delegation address
+  set_fact:
+    self_delegation_address: "{{ add_validator_key_output.stdout | regex_search('address:\\s*([a-zA-Z0-9]+)', '\\1') }}"
+
+- name: Debug self delegation address
+  debug:
+    msg: "Self delegation address is {{ self_delegation_address }}"
+
+- name: Extract self delegation pubkey
+  set_fact:
+    self_delegation_pubkey: "{{ add_validator_key_output.stdout | regex_search('key\":\"([A-Za-z0-9+/=]+)\"', '\\1') }}"
+
+- name: Debug self delegation pubkey
+  debug:
+    msg: "Self delegation pubkey is {{ self_delegation_pubkey }}"
+
+- name: Extract the operator address
+  command: "{{ daemon }} keys show {{ validator_name }} --bech=val"
+  register: operator_address_output
+  environment:
+    PATH: "{{ path }}"
+
+- name: Debug operator address output
+  debug:
+    msg: "Operator address output is {{ operator_address_output.stdout }}"
+
+- name: Set operator address from command output
+  set_fact:
+    operator_address: "{{ operator_address_output.stdout | regex_search('address:\\s*(\\S+)', '\\1') }}"
+
+- name: Debug operator address
+  debug:
+    msg: "Operator address is {{ operator_address }}"
+
+- name: Read priv_validator_key.json from remote host
+  slurp:
+    src: "{{ ansible_env.HOME }}/{{ node_home }}/config/priv_validator_key.json"
+  register: slurped_priv_key
+
+- name: Decode priv_validator_key.json
+  set_fact:
+    priv_validator_data: "{{ slurped_priv_key.content | b64decode | from_json }}"
+
+- name: Set operator pubkey and hex address
+  set_fact:
+    operator_pubkey: "{{ priv_validator_data.pub_key.value }}"
+    hex_address: "{{ priv_validator_data.address }}"
+
+- name: Debug operator pubkey
+  debug:
+    var: operator_pubkey
+
+- name: Debug hex address
+  debug:
+    var: hex_address
+
+- name: Fetch the consensus address
+  command: "{{ daemon }} keys parse {{ hex_address }}"
+  register: consensus_address_output
+  environment:
+    PATH: "{{ path }}"
+
+- name: Fetch only the consensus address (valcons, not valconspub)
+  shell: >
+    {{ daemon }} keys parse {{ hex_address }}
+    | grep -Eo '[a-z0-9]+valcons[0-9a-z]+'
+    | grep -v valconspub
+    | head -n 1
+  register: consensus_address_output
+  environment:
+    PATH: "{{ path }}"
+  changed_when: false
+
+- name: Set consensus address fact
+  set_fact:
+    consensus_address: "{{ consensus_address_output.stdout }}"
+
+- name: Debug consensus address
+  debug:
+    msg: "Consensus address is {{ consensus_address }}"
+
+- name: Initialize the fullnode
+  become: true
+  command: "{{ daemon }} init {{ fullnode_name }} --home {{ user_home }}/{{ node_home }}_fullnode"
+  environment:
+    PATH: "{{ path }}"
+
+- name: Remove the default genesis file for the validator
+  become: true
+  file:
+    path: "{{ user_home }}/{{ node_home }}/config/genesis.json"
+    state: absent
+
+- name: Remove the default genesis file for the fullnode
+  become: true
+  file:
+    path: "{{ user_home }}/{{ node_home }}_fullnode/config/genesis.json"
+    state: absent
+
+- name: Extract node-id of the validator
+  become: true
+  shell: "{{ daemon }} tendermint show-node-id"
+  register: node_ids
+  environment:
+    PATH: "{{ path }}"
+
+- name: Set the persistent peer for the fullnode
+  become: true
+  lineinfile:
+    path: "{{ user_home }}/{{ node_home }}_fullnode/config/config.toml"
+    regexp: "^persistent_peers ="
+    line: 'persistent_peers = "{{ node_ids.stdout }}@{{ hostvars[inventory_hostname].ansible_host }}:26656"'
