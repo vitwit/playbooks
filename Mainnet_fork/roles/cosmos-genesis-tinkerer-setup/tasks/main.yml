@@ -19,7 +19,6 @@
   copy:
     src: "{{ state_export_file_path }}"
     dest: "{{ user_home }}/cosmos-genesis-tinkerer/state_export.json"
-    remote_src: yes
   when: state_export_file_path !=""
 
 - name: Copy the example_mainnet_genesis.py file
