@@ -5,8 +5,6 @@
 
 - name: Download go tar file
   command: curl -L https://go.dev/dl/go{{ go_version }}.linux-amd64.tar.gz -o /tmp/go{{ go_version }}.linux-amd64.tar.gz
-  args:
-    warn: false
   become: true
 
 - name: Delete previous installation
