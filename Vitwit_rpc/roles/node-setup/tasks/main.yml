@@ -1,0 +1,213 @@
+---
+- name: Configure  Mainnet Node
+  block:
+
+  - name: Initialize node
+    command: >
+      {{ daemon }} init {{ moniker }} --chain-id {{ chain_id }}
+    args:
+      creates: "{{ home_dir }}/config/genesis.json"
+    environment:
+      PATH: "{{ path }}"
+    when: network not in ['akash']  
+
+  - name: Initialize node for akash
+    command: >
+      {{ daemon }} genesis init {{ moniker }} --chain-id {{ chain_id }}
+    args:
+      creates: "{{ home_dir }}/config/genesis.json"
+    environment:
+      PATH: "{{ path }}"
+    when: network in ['akash']    
+
+
+  - name: Download genesis
+    get_url:
+      url: "{{ genesis_url }}"
+      dest: "/tmp/genesis.{{ 'json' if network in ['mantra', 'regen', 'akash', 'cheqd', 'passage'] else 'json.gz' }}"
+      mode: '0644'
+
+  - name: Extract genesis (gzip networks)
+    shell: |
+      gunzip -c /tmp/genesis.json.gz > {{ home_dir }}/config/genesis.json
+    when: network not in ['mantra', 'regen', 'akash', 'cheqd', 'passage']
+
+  - name: Copy genesis directly (mantra/regen/akash/cheqd/passage)
+    copy:
+      src: /tmp/genesis.json
+      dest: "{{ home_dir }}/config/genesis.json"
+      remote_src: yes
+    when: network in ['mantra', 'regen', 'akash', 'cheqd', 'passage']
+
+  - name: Set seeds
+    lineinfile:
+      path: "{{ home_dir }}/config/config.toml"
+      regexp: '^seeds ='
+      line: 'seeds = "{{ seeds }}"'
+
+  - name: Set persistent peers
+    lineinfile:
+      path: "{{ home_dir }}/config/config.toml"
+      regexp: '^persistent_peers ='
+      line: 'persistent_peers = "{{ persistent_peers }}"'
+
+  - name: Update minimum gas price for validators
+    lineinfile:
+      path: "{{ home_dir }}/config/app.toml"
+      regexp: "^minimum-gas-prices ="
+      line: 'minimum-gas-prices = "{{ minimum_gas_price }}"'
+
+  - name: Set max inbound peers
+    lineinfile:
+      path: "{{ home_dir }}/config/config.toml"
+      regexp: '^max_num_inbound_peers ='
+      line: 'max_num_inbound_peers = 100'
+
+  - name: Set max outbound peers
+    lineinfile:
+      path: "{{ home_dir }}/config/config.toml"
+      regexp: '^max_num_outbound_peers ='
+      line: 'max_num_outbound_peers = 100'    
+
+  - name: Set pruning mode
+    lineinfile:
+      path: "{{ home_dir }}/config/app.toml"
+      regexp: '^pruning ='
+      line: 'pruning = "custom"'
+
+  - name: Set pruning keep recent
+    lineinfile:
+      path: "{{ home_dir }}/config/app.toml"
+      regexp: '^pruning-keep-recent ='
+      line: 'pruning-keep-recent = "100"'
+
+  - name: Set pruning keep every
+    lineinfile:
+      path: "{{ home_dir }}/config/app.toml"
+      regexp: '^pruning-keep-every ='
+      line: 'pruning-keep-every = "0"'
+
+  - name: Set pruning interval
+    lineinfile:
+      path: "{{ home_dir }}/config/app.toml"
+      regexp: '^pruning-interval ='
+      line: 'pruning-interval = "10"'    
+
+  - name: Create systemd service
+    copy:
+      dest: "/etc/systemd/system/{{ daemon }}.service"
+      content: |
+        [Unit]
+        Description=Cosmos Hub Node
+        After=network.target
+
+        [Service]
+        User={{ user }}
+        ExecStart={{ user_home }}/go/bin/{{ daemon }} start
+        Restart=always
+        RestartSec=3
+        LimitNOFILE=65535
+
+        [Install]
+        WantedBy=multi-user.target
+
+  - name: Reload systemd
+    command: systemctl daemon-reload
+
+  - name: Enable node service
+    systemd:
+      name: "{{ daemon }}"
+      enabled: yes
+
+  - name: Stop node service
+    systemd:
+      name: "{{ daemon }}"
+      state: stopped    
+
+  - name: Get Polkachu snapshot page
+    uri:
+      url: "{{ polkachu_web }}"
+      return_content: yes
+    register: snapshot_page
+
+  - name: Extract snapshot URL for cosmos
+    set_fact:
+      snapshot_url: "{{ snapshot_page.content | regex_search('https://snapshots\\.polkachu\\.com/snapshots/cosmos/cosmos_[0-9]+\\.tar\\.lz4') }}"
+    when: network == "cosmos"
+
+  - name: Extract snapshot URL for mantra
+    set_fact:
+      snapshot_url: "{{ snapshot_page.content | regex_search('https://snapshots\\.polkachu\\.com/snapshots/mantra/mantra_[0-9]+\\.tar\\.lz4') }}"
+    when: network == "mantra"  
+
+  - name: Extract snapshot URL for regen
+    set_fact:
+      snapshot_url: "{{ snapshot_page.content | regex_search('https://snapshots\\.polkachu\\.com/snapshots/regen/regen_[0-9]+\\.tar\\.lz4') }}"
+    when: network == "regen" 
+
+  - name: Extract snapshot URL for akash
+    set_fact:
+      snapshot_url: "{{ snapshot_page.content | regex_search('https://snapshots\\.polkachu\\.com/snapshots/akash/akash_[0-9]+\\.tar\\.lz4') }}"
+    when: network == "akash"   
+
+  - name: Extract snapshot URL for cheqd
+    set_fact:
+      snapshot_url: "{{ snapshot_page.content | regex_search('https://snapshots\\.polkachu\\.com/snapshots/cheqd/cheqd_[0-9]+\\.tar\\.lz4') }}"
+    when: network == "cheqd"    
+
+  - name: Extract snapshot URL for passage
+    set_fact:
+      snapshot_url: "{{ snapshot_page.content | regex_search('https://snapshots\\.polkachu\\.com/snapshots/passage/passage_[0-9]+\\.tar\\.lz4') }}"
+    when: network == "passage"     
+
+
+
+
+
+  - name: Debug snapshot URL
+    debug:
+      var: snapshot_url
+  - name: Extract snapshot filename
+    set_fact:
+      snapshot_file: "{{ snapshot_url | basename }}"
+
+  - name: Debug snapshot filename
+    debug:
+      var: snapshot_file    
+
+
+  - name: Download snapshot with progress
+    shell: |
+      wget -4 -O {{ snapshot_file }} {{ snapshot_url }} --progress=bar:force
+    args:
+      chdir: "{{ home_dir }}"
+      creates: "{{ home_dir }}/{{ snapshot_file }}"
+
+  # - name: Run tendermint unsafe-reset
+  #   command: "{{ daemon }} tendermint unsafe-reset-all --home {{ home_dir }} --keep-addr-book"
+  #   environment:
+  #     PATH: "{{ path }}" 
+
+  - name: Remove the wasm folder
+    file:     
+      path: "{{ home_dir }}/wasm"
+      state: absent
+
+  - name: Extract snapshot safely
+    shell: |
+      set -o pipefail
+      lz4 -c -d {{ snapshot_file }} | tar -x -C {{ home_dir }}
+    args:
+      chdir: "{{ home_dir }}"
+      executable: /bin/bash
+      # creates: "{{ home_dir }}/data/application.db"
+  
+  - name: Remove snapshot archive
+    file:
+      path: "{{ home_dir }}/{{ snapshot_file }}"
+      state: absent
+
+  - name: Start node service
+    systemd:
+      name: "{{ daemon }}"
+      state: started    

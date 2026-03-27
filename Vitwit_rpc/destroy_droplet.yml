@@ -1,0 +1,23 @@
+---
+- name: Destroy the droplet
+  hosts: localhost
+  vars_files:
+    - "vars/{{ network }}.yml"
+  tasks:
+
+  - name: Destroy Mainnet Node Droplet
+    community.digitalocean.digital_ocean_droplet:
+      state: absent
+      name: "{{ droplet_name }}"
+      unique_name: true
+      oauth_token: "{{ digital_ocean_api_token }}"
+    register: delete_result
+
+  - name: Show deletion result
+    debug:
+      var: delete_result
+
+  # - name: Delete server from DB
+  #   shell: |
+  #     psql "postgresql://USER:PASSWORD@HOST:5432/DB_NAME" \
+  #     -c "DELETE FROM servers WHERE ip='{{ node_ip }}';"      

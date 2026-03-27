@@ -1,0 +1,16 @@
+chain_id: passage-2
+daemon: passage
+git_repo: https://github.com/envadiv/Passage3D
+moniker: node
+version: v2.6.0
+genesis_url: https://raw.githubusercontent.com/envadiv/mainnet/main/passage-2/genesis.json
+persistent_peers: "d35d652b6cb3bf7d6cb8d4bd7c036ea03e7be2ab@116.203.182.185:26656,8e0b0d4f80d0d2853f853fbd6a76390113f07d72@65.108.127.249:26656,ebc272824924ea1a27ea3183dd0b9ba713494f83@passage-mainnet-peer.autostake.com:26916,621f75a74a95298fe16e0c2dd899c087bcba6594@65.108.195.29:50656,2b238d2c05c47629e03608a6107e156fcb50344c@65.108.101.158:20556"
+seeds: "aebb8431609cb126a977592446f5de252d8b7fa1@104.236.201.138:26656,b6beabfb9309330944f44a1686742c2751748b83@5.161.47.163:26656,7a9a36630523f54c1a0d56fc01e0e153fd11a53d@167.235.24.145:26656,ade4d8bc8cbe014af6ebdf3cb7b1e9ad36f412c0@seeds.polkachu.com:15656,20e1000e88125698264454a884812746c2eb4807@seeds.lavenderfive.com:15656,ebc272824924ea1a27ea3183dd0b9ba713494f83@passage-mainnet-seed.autostake.com:26916,8542cd7e6bf9d260fef543bc49e59be5a3fa9074@seed.publicnode.com:26656,df949a46ae6529ae1e09b034b49716468d5cc7e9@seeds.stakerhouse.com:10556,2b238d2c05c47629e03608a6107e156fcb50344c@65.108.101.158:20556"
+home_dir: "{{ ansible_env.HOME }}/.passage"
+minimum_gas_price: 12.5upasg
+polkachu_web: https://www.polkachu.com/tendermint_snapshots/passage
+droplet_size: s-8vcpu-32gb-amd
+region: blr1
+snap_name:
+droplet_name: passage-node
+go_version: 1.24.3

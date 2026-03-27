@@ -1,0 +1,28 @@
+---
+- name: Create Droplets
+  hosts: localhost
+  roles:
+    - droplet-create
+  vars_files:
+    - vars/{{ network }}.yml  
+
+
+- name: Installations
+  become: true
+  hosts: mainnet
+  vars:
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+  roles:
+    - installations
+  vars_files:
+    - vars/{{ network }}.yml
+
+- name: Node Setup
+  become: true
+  hosts: mainnet
+  roles:
+    - node-setup  
+  vars:
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+  vars_files:
+    - vars/{{ network }}.yml        

@@ -1,0 +1,91 @@
+---
+- name: Get DigitalOcean SSH Key ID
+  uri:
+    url: "https://api.digitalocean.com/v2/account/keys"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ digital_ocean_api_token }}"
+    return_content: yes
+  register: ssh_key_response
+
+- name: Parse SSH Key ID
+  set_fact:
+    ssh_key_id: "{{ (ssh_key_response.json | json_query(query)) | first }}"
+  vars:
+    query: "ssh_keys[?name=='{{ ssh_key_name }}'].id"
+
+- name: Ensure SSH key ID was found
+  fail:
+    msg: "SSH key '{{ ssh_key_name }}' not found in DigitalOcean account."
+  when: ssh_key_id is not defined
+
+- name: Read SSH file contents
+  slurp:
+    src: "{{ ssh_file_path }}"
+  register: ssh_content
+
+- name: Store SSH key contents into variable
+  set_fact:
+    ssh_key_variable: "{{ ssh_content.content | b64decode }}"
+
+# Create Single Node
+- name: Create Mainnet Node Droplet
+  digital_ocean_droplet:
+    state: present
+    name: "{{ droplet_name }}"
+    size: "{{ droplet_size }}"
+    image: ubuntu-24-04-x64
+    region: "{{ region }}"
+    ssh_keys: "{{ ssh_key_id }}"
+    monitoring: false
+    ipv6: false
+    user_data: |
+      #cloud-config
+      users:
+        - name: {{ user }}
+          groups: sudo
+          sudo: "ALL=(ALL) NOPASSWD:ALL"
+          shell: /bin/bash
+          ssh-authorized-keys:
+            - {{ ssh_key_variable }}
+    api_token: "{{ digital_ocean_api_token }}"
+  register: droplet
+
+# Extract IP
+- name: Extract node IP
+  set_fact:
+    node_ip: "{{ droplet.data.droplet.networks.v4[0].ip_address }}"
+
+
+- name: Debug node IP
+  debug:
+    var: node_ip
+
+# - name: Insert server into DB
+#   shell: |
+#     psql "postgresql://USER:PASSWORD@HOST:5432/DB_NAME" \
+#     -c "INSERT INTO servers (name, ip) VALUES ('{{ droplet_name }}', '{{ node_ip }}');"    
+# Save into inventory.ini
+# - name: Append node to inventory.ini
+#   lineinfile:
+#     path: inventory.ini
+#     insertafter: "^\\[mainnet\\]"
+#     line: "mainnet-node ansible_host={{ node_ip }} ansible_user={{ user }}"
+
+# Disable host key checking
+# - name: Disable host key checking
+#   set_fact:
+#     ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+
+# Wait for SSH
+- name: Wait for instance to boot
+  pause:
+    seconds: 40
+
+# Add host dynamically
+- name: Add node to inventory
+  add_host:
+    name: mainnet-node
+    ansible_host: "{{ node_ip }}"
+    ansible_user: "{{ user }}"
+    groups: mainnet

@@ -1,0 +1,16 @@
+chain_id: cheqd-mainnet-1
+daemon: cheqd-noded
+git_repo: https://github.com/cheqd/cheqd-node
+moniker: node
+version: v4.2.1
+genesis_url: https://raw.githubusercontent.com/cheqd/cheqd-node/main/networks/mainnet/genesis.json
+persistent_peers: "d1ebb60825e2c29181b499f93493dd440fb87997@sentry1.eu.cheqd.net:26656,46bb1e68fcc2750ecdc4253986d653f4bd7228ef@cheqd.peer.stavr.tech:21016,513d334bb044296796939e57b522fef7fd4b9c6c@sentry2.eu.cheqd.net:26656,9201b408d24941fd342e739f0814aa3eb8ab7577@sentry1.ap.cheqd.net:26656,ebc272824924ea1a27ea3183dd0b9ba713494f83@cheqd-mainnet-peer.autostake.com:27326"
+seeds: "258a9bfb822637bfca87daaab6181c10e7fd0910@seed1.eu.cheqd.net:26656,f565ff792b20977face9817df6acb268d41d4092@seed2.eu.cheqd.net:26656,388947cc7d901c5c06fedc4c26751634564d68e6@seed3.eu.cheqd.net:26656,9b30307a2a2819790d68c04bb62f5cf4028f447e@seed1.ap.cheqd.net:26656,ebc272824924ea1a27ea3183dd0b9ba713494f83@cheqd-mainnet-seed.autostake.com:27326,20e1000e88125698264454a884812746c2eb4807@seeds.lavenderfive.com:16156,c28827cb96c14c905b127b92065a3fb4cd77d7f6@seeds.whispernode.com:16156,8542cd7e6bf9d260fef543bc49e59be5a3fa9074@seed.publicnode.com:26656"
+home_dir: "{{ ansible_env.HOME }}/.cheqdnode"
+minimum_gas_price: 7500ncheq
+polkachu_web: https://www.polkachu.com/tendermint_snapshots/cheqd
+droplet_size: s-8vcpu-32gb-amd
+region: blr1
+snap_name:
+droplet_name: cheqd-node
+go_version: 1.24.3

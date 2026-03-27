@@ -1,0 +1,134 @@
+---
+- name: Install Cosmos Node Binary
+  block:
+
+  - name: Wait for server boot
+    pause:
+      seconds: 20
+
+  - name: Debug user home
+    debug:
+      msg: "User Directory: {{ user_home }}"
+
+  - name: Download Go tar file
+    get_url:
+      url: "https://go.dev/dl/go{{ go_version }}.linux-amd64.tar.gz"
+      dest: "/tmp/go{{ go_version }}.linux-amd64.tar.gz"
+
+  - name: Delete previous Go installation
+    file:
+      path: /usr/local/go
+      state: absent
+
+  - name: Extract Go
+    unarchive:
+      src: "/tmp/go{{ go_version }}.linux-amd64.tar.gz"
+      dest: /usr/local
+      remote_src: yes
+
+  - name: Delete Go archive
+    file:
+      path: "/tmp/go{{ go_version }}.linux-amd64.tar.gz"
+      state: absent
+
+  - name: Set Go environment variables
+    lineinfile:
+      path: "{{ user_home }}/.profile"
+      line: |
+        export GOROOT=/usr/local/go
+        export GOPATH={{ user_home }}/go
+        export GOBIN=$GOPATH/bin
+        export PATH=$PATH:/usr/local/go/bin:$GOBIN
+      create: yes
+      state: present
+
+  - name: Wait after Go install
+    pause:
+      seconds: 10
+
+  - name: Update apt cache
+    apt:
+      update_cache: yes
+
+  - name: Install prerequisites
+    apt:
+      name:
+        - unzip
+        - curl
+        - jq
+        # - gcc
+        - git
+        - build-essential
+        # - g++
+      state: present
+      update_cache: yes
+  - name: Install lz4
+    apt:
+      name: lz4
+      state: present
+      update_cache: yes    
+
+      
+
+  - name: Clone Cosmos repo
+    git:
+      repo: "{{ git_repo }}"
+      dest: "{{ user_home }}/{{ daemon }}"
+      version: "{{ version }}"
+      update: yes
+      force: yes
+    when: network not in ['akash']  
+
+
+
+  - name: Build binary
+    command: make install
+    args:
+      chdir: "{{ user_home }}/{{ daemon }}"
+    environment:
+      PATH: "/usr/local/go/bin:{{ user_home }}/go/bin:{{ ansible_env.PATH }}"
+      GOPATH: "{{ user_home }}/go"
+    become_user: "{{ user }}"
+    when: network not in ['akash']
+
+  - name: Download binary zip
+    get_url:
+      url: "{{ binary_url }}"
+      dest: "/tmp/{{ daemon }}.zip"
+      mode: '0644'
+    when: network in ['akash']
+
+  - name: Extract binary
+    unarchive:
+      src: "/tmp/{{ daemon }}.zip"
+      dest: "/tmp/"
+      remote_src: yes
+    when: network in ['akash']
+  
+
+  - name: Move binary to /usr/local/bin
+    copy:
+      src: "/tmp/{{ daemon }}"
+      dest: "/usr/local/bin/{{ daemon }}"
+      mode: '0755'
+      remote_src: yes
+    when: network in ['akash']
+  
+  
+  - name: Ensure binary is executable
+    file:
+      path: "/usr/local/bin/{{ daemon }}"
+      mode: '0755'
+      state: file
+    when: network in ['akash']
+  
+
+  - name: Cleanup zip
+    file:
+      path: "/tmp/{{ daemon }}.zip"
+      state: absent
+    when: network in ['akash']
+
+
+
+    

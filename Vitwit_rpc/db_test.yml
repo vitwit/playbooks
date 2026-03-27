@@ -1,0 +1,10 @@
+---
+- name: Test DB Insert
+  hosts: localhost
+  gather_facts: no
+
+  tasks:
+    - name: Insert server into DB
+      shell: |
+        psql "postgresql://postgres:postgres@localhost:5432/myapp" \
+        -c "INSERT INTO servers (name, ip) VALUES ('test-node', '143.244.129.139');"
