@@ -67,9 +67,7 @@
       name: lz4
       state: present
       update_cache: yes    
-
       
-
   - name: Clone Cosmos repo
     git:
       repo: "{{ git_repo }}"
@@ -78,8 +76,6 @@
       update: yes
       force: yes
     when: network not in ['akash']  
-
-
 
   - name: Build binary
     command: make install
@@ -98,6 +94,15 @@
       mode: '0644'
     when: network in ['akash']
 
+  - name: Ensure GOPATH bin exists
+    file:
+      path: "{{ user_home }}/go/bin"
+      state: directory
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: '0755'
+    when: network in ['akash']  
+
   - name: Extract binary
     unarchive:
       src: "/tmp/{{ daemon }}.zip"
@@ -105,24 +110,21 @@
       remote_src: yes
     when: network in ['akash']
   
-
-  - name: Move binary to /usr/local/bin
+  - name: Move binary to {{ user_home }}/go/bin
     copy:
       src: "/tmp/{{ daemon }}"
-      dest: "/usr/local/bin/{{ daemon }}"
+      dest: "{{ user_home }}/go/bin/{{ daemon }}"
       mode: '0755'
       remote_src: yes
     when: network in ['akash']
   
-  
   - name: Ensure binary is executable
     file:
-      path: "/usr/local/bin/{{ daemon }}"
+      path: "{{ user_home }}/go/bin/{{ daemon }}"
       mode: '0755'
       state: file
     when: network in ['akash']
   
-
   - name: Cleanup zip
     file:
       path: "/tmp/{{ daemon }}.zip"

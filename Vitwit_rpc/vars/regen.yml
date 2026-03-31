@@ -2,7 +2,7 @@ chain_id: regen-1
 daemon: regen
 git_repo: https://github.com/regen-network/regen-ledger
 moniker: node
-version: v5.0.0
+version: v7.2.0
 genesis_url: https://raw.githubusercontent.com/regen-network/mainnet/main/regen-1/genesis.json
 persistent_peers: "d35d652b6cb3bf7d6cb8d4bd7c036ea03e7be2ab@116.203.182.185:26656,ebc272824924ea1a27ea3183dd0b9ba713494f83@regen-mainnet-peer.autostake.com:27216"
 seeds: "aebb8431609cb126a977592446f5de252d8b7fa1@104.236.201.138:26656,8542cd7e6bf9d260fef543bc49e59be5a3fa9074@seed.publicnode.com:26656,dc7121500d58d40c98f06f14d5a9065935a7adf6@regen.seed.stavr.tech:2126,ebc272824924ea1a27ea3183dd0b9ba713494f83@regen-mainnet-seed.autostake.com:27216"
@@ -12,5 +12,4 @@ polkachu_web: https://www.polkachu.com/tendermint_snapshots/regen
 droplet_size: s-4vcpu-8gb-240gb-intel
 droplet_name: regen-node
 region: sgp1
-snap_name: regen
 go_version: 1.24.3

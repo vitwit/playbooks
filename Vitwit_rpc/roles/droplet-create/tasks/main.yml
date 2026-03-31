@@ -65,24 +65,11 @@
 #   shell: |
 #     psql "postgresql://USER:PASSWORD@HOST:5432/DB_NAME" \
 #     -c "INSERT INTO servers (name, ip) VALUES ('{{ droplet_name }}', '{{ node_ip }}');"    
-# Save into inventory.ini
-# - name: Append node to inventory.ini
-#   lineinfile:
-#     path: inventory.ini
-#     insertafter: "^\\[mainnet\\]"
-#     line: "mainnet-node ansible_host={{ node_ip }} ansible_user={{ user }}"
 
-# Disable host key checking
-# - name: Disable host key checking
-#   set_fact:
-#     ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
-
-# Wait for SSH
 - name: Wait for instance to boot
   pause:
     seconds: 40
 
-# Add host dynamically
 - name: Add node to inventory
   add_host:
     name: mainnet-node

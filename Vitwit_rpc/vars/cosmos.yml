@@ -11,6 +11,5 @@ minimum_gas_price: "0.025uatom"
 polkachu_web: https://www.polkachu.com/tendermint_snapshots/cosmos
 droplet_size: s-8vcpu-32gb-amd
 region: blr1
-snap_name: cosmos
 droplet_name: cosmos-node
 go_version: 1.24.3

@@ -11,6 +11,5 @@ minimum_gas_price: 12.5upasg
 polkachu_web: https://www.polkachu.com/tendermint_snapshots/passage
 droplet_size: s-8vcpu-32gb-amd
 region: blr1
-snap_name:
 droplet_name: passage-node
 go_version: 1.24.3

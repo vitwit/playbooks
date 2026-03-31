@@ -19,5 +19,5 @@
 
   # - name: Delete server from DB
   #   shell: |
-  #     psql "postgresql://USER:PASSWORD@HOST:5432/DB_NAME" \
-  #     -c "DELETE FROM servers WHERE ip='{{ node_ip }}';"      
+  #     psql "postgresql://postgres:postgres@localhost:5432/postgres" \
+  #     -c "DELETE FROM network WHERE name='{{ droplet_name }}';"      

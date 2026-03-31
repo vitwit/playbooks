@@ -20,7 +20,24 @@
       PATH: "{{ path }}"
     when: network in ['akash']    
 
+  - name: Create price-feeder.toml from template
+    template:
+      src: cheqd_price_feeder.j2
+      dest: "{{ home_dir }}/config/price-feeder.toml"
+      mode: '0644'
+    when: network == "cheqd"
 
+  - name: add price feeder file path to app.toml
+    lineinfile:
+      path: "{{ home_dir }}/config/app.toml"
+      regexp: '^config_path ='
+      line: 'config_path = "{{ home_dir }}/config/price-feeder.toml"'
+      insertafter: '^\[pricefeeder\]'
+    when: network == "cheqd"
+
+
+
+##################################
   - name: Download genesis
     get_url:
       url: "{{ genesis_url }}"
@@ -129,6 +146,7 @@
       url: "{{ polkachu_web }}"
       return_content: yes
     register: snapshot_page
+    when: network != "akash"
 
   - name: Extract snapshot URL for cosmos
     set_fact:
@@ -145,10 +163,6 @@
       snapshot_url: "{{ snapshot_page.content | regex_search('https://snapshots\\.polkachu\\.com/snapshots/regen/regen_[0-9]+\\.tar\\.lz4') }}"
     when: network == "regen" 
 
-  - name: Extract snapshot URL for akash
-    set_fact:
-      snapshot_url: "{{ snapshot_page.content | regex_search('https://snapshots\\.polkachu\\.com/snapshots/akash/akash_[0-9]+\\.tar\\.lz4') }}"
-    when: network == "akash"   
 
   - name: Extract snapshot URL for cheqd
     set_fact:
@@ -171,6 +185,11 @@
     set_fact:
       snapshot_file: "{{ snapshot_url | basename }}"
 
+  - name: Override snapshot filename for akash
+    set_fact:
+      snapshot_file: "akash_snapshot.tar.lz4"
+    when: network == "akash"    
+
   - name: Debug snapshot filename
     debug:
       var: snapshot_file    
@@ -183,10 +202,7 @@
       chdir: "{{ home_dir }}"
       creates: "{{ home_dir }}/{{ snapshot_file }}"
 
-  # - name: Run tendermint unsafe-reset
-  #   command: "{{ daemon }} tendermint unsafe-reset-all --home {{ home_dir }} --keep-addr-book"
-  #   environment:
-  #     PATH: "{{ path }}" 
+
 
   - name: Remove the wasm folder
     file:     
@@ -200,7 +216,7 @@
     args:
       chdir: "{{ home_dir }}"
       executable: /bin/bash
-      # creates: "{{ home_dir }}/data/application.db"
+      
   
   - name: Remove snapshot archive
     file:
