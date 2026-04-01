@@ -11,5 +11,4 @@ minimum_gas_price: 7500ncheq
 polkachu_web: https://www.polkachu.com/tendermint_snapshots/cheqd
 droplet_size: s-8vcpu-32gb-amd
 region: blr1
-droplet_name: cheqd-node
 go_version: 1.24.3

@@ -10,6 +10,5 @@ home_dir: "{{ ansible_env.HOME }}/.regen"
 minimum_gas_price: 0.015uregen
 polkachu_web: https://www.polkachu.com/tendermint_snapshots/regen
 droplet_size: s-4vcpu-8gb-240gb-intel
-droplet_name: regen-node
 region: sgp1
 go_version: 1.24.3

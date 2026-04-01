@@ -9,6 +9,5 @@ minimum_gas_price: 0.025uakt
 snapshot_url: https://snapshots.akash.network/akashnet-2/latest
 droplet_size: s-8vcpu-32gb-amd
 region: blr1
-droplet_name: akash-node
 go_version: 1.24.3
 binary_url: https://github.com/akash-network/node/releases/download/v2.0.1/akash_linux_amd64.zip

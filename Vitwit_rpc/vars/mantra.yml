@@ -10,7 +10,6 @@ home_dir: "{{ ansible_env.HOME }}/.mantrachain"
 minimum_gas_price: 40000000000amantra
 polkachu_web: https://www.polkachu.com/tendermint_snapshots/mantra
 droplet_size: s-8vcpu-32gb-amd
-droplet_name: mantra-node
 region: blr1
 go_version: 1.24.3
 binary_url:

@@ -51,6 +51,13 @@
     api_token: "{{ digital_ocean_api_token }}"
   register: droplet
 
+- name: Set droplet ID
+  set_fact:
+    droplet_id: "{{ droplet.data.droplet.id }}"
+
+- name: Debug droplet ID
+  debug:
+    var: droplet_id    
 # Extract IP
 - name: Extract node IP
   set_fact:
@@ -64,7 +71,7 @@
 # - name: Insert server into DB
 #   shell: |
 #     psql "postgresql://USER:PASSWORD@HOST:5432/DB_NAME" \
-#     -c "INSERT INTO servers (name, ip) VALUES ('{{ droplet_name }}', '{{ node_ip }}');"    
+#     -c "INSERT INTO servers (name, ip,droplet_id) VALUES ('{{ droplet_name }}', '{{ node_ip }}', '{{ droplet_id }}');"    
 
 - name: Wait for instance to boot
   pause:
