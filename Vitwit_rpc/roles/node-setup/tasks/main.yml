@@ -110,6 +110,35 @@
       regexp: '^pruning-interval ='
       line: 'pruning-interval = "10"'    
 
+  - name: Make rpc publicly accessible
+    become: true
+    lineinfile:
+      path: "{{ home_dir }}/config/config.toml"
+      regexp: 'laddr = "tcp://127.0.0.1:26657"'
+      line: 'laddr = "tcp://0.0.0.0:26657"'
+
+  - name: replace localhost under api section
+    become: true
+    replace:
+      path: "{{ home_dir }}/config/app.toml"
+      regexp: 'address = "tcp://localhost:1317"'
+      replace: 'address = "tcp://0.0.0.0:1317"'
+
+  - name: Making the change in the CORS section of config.toml
+    become: true
+    lineinfile:
+      path: "{{ home_dir }}/config/config.toml"
+      regexp: 'cors_allowed_origins = \[\]'
+      line: 'cors_allowed_origins = ["*"]'
+
+
+  - name: set enable to true under api section
+    become: true
+    replace:
+      path: "{{ home_dir }}/config/app.toml"
+      regexp: '(?ms)(\[api\][^\[]*enable\s*=\s*)false'
+      replace: '\1true'
+
   - name: Create systemd service
     copy:
       dest: "/etc/systemd/system/{{ daemon }}.service"
