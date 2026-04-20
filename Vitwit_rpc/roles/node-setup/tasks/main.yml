@@ -144,15 +144,20 @@
       dest: "/etc/systemd/system/{{ daemon }}.service"
       content: |
         [Unit]
-        Description=Cosmos Hub Node
+        Description=Node
         After=network.target
 
         [Service]
         User={{ user }}
-        ExecStart={{ user_home }}/go/bin/{{ daemon }} start
+        WorkingDirectory={{ user_home }}
+        ExecStart={{ user_home }}/go/bin/cosmovisor run start
         Restart=always
         RestartSec=3
         LimitNOFILE=65535
+        Environment="DAEMON_ALLOW_DOWNLOAD_BINARIES=true"
+        Environment="DAEMON_NAME={{ daemon }}"
+        Environment="DAEMON_HOME={{ home_dir }}"
+        Environment="DAEMON_RESTART_AFTER_UPGRADE=true"
 
         [Install]
         WantedBy=multi-user.target

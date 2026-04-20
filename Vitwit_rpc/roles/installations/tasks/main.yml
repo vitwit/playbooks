@@ -131,6 +131,41 @@
       state: absent
     when: network in ['akash']
 
+##########################################################################
+
+  - name: Install cosmovisor
+    command: go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest
+    environment:
+      PATH: "{{ path }}"
+  
+  - name: Create cosmovisor directories for validator
+    file:
+      path: "{{ home_dir }}/cosmovisor/{{ item }}"
+      state: directory
+      mode: "0755"
+    loop:
+      - genesis/bin
+  
+  
+  - name: Copy the binary into the cosmovisor directory for validator
+    copy:
+      src: "{{ user_home }}/go/bin/{{ daemon }}"
+      dest: "{{ home_dir }}/cosmovisor/genesis/bin/{{ daemon }}"
+      mode: "0755"
+      remote_src: yes
+  - name: Change ownership of validator cosmovisor directory
+    become: true
+    file:
+      path: "{{ home_dir }}/cosmovisor"
+      owner: "{{ ansible_user }}"
+      group: "{{ ansible_user }}"
+      recurse: yes
+  - name: Ensure cosmovisor current symlink for validator
+    file:
+      src: "{{ home_dir }}/cosmovisor/genesis"
+      dest: "{{ home_dir }}/cosmovisor/current"
+      state: link
+
 
 
     
